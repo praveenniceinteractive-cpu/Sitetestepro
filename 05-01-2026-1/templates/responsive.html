@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Responsive Audit - Choose Mode</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="/static/style.css" rel="stylesheet" />
+</head>
+<body class="bg-gray-900 text-white min-h-screen">
+  <!-- Navigation Bar -->
+  <nav class="bg-gray-800/80 backdrop-blur border-b border-gray-700">
+    <div class="container mx-auto px-6 py-4">
+      <div class="flex justify-between items-center">
+        <div class="text-xl font-bold text-cyan-300">Audit Dashboard</div>
+        <div class="flex items-center gap-4">
+          <a href="/" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition">Dashboard</a>
+          <a href="/profile" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 rounded-lg transition">Profile</a>
+          <button onclick="logout()" class="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg transition">Logout</button>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container mx-auto px-6 py-12 max-w-7xl">
+    <h1 class="text-5xl font-bold text-center mb-12 text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-600">
+      Responsive Audit Tool
+    </h1>
+
+    <div class="text-center mb-16 max-w-3xl mx-auto">
+      <p class="text-xl text-gray-300 mb-6">Choose your testing mode:</p>
+      <div class="flex items-center justify-center gap-4">
+        <div class="w-4 h-4 rounded-full bg-cyan-500"></div>
+        <p class="text-lg"><span class="text-cyan-300">Static:</span> Fast screenshots of pages in different resolutions</p>
+      </div>
+      <div class="flex items-center justify-center gap-4 mt-2">
+        <div class="w-4 h-4 rounded-full bg-blue-500"></div>
+        <p class="text-lg"><span class="text-blue-300">Dynamic:</span> Interactive videos showing page behavior and scrolling</p>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-12 max-w-6xl mx-auto">
+      <!-- Static Audit Card -->
+      <a href="/responsive/static" class="group">
+        <div class="glow-box bg-gradient-to-br from-cyan-900/50 to-blue-900/50 backdrop-blur-lg border border-cyan-500/30 rounded-3xl p-12 text-center transform transition-all duration-500 hover:scale-105 hover:shadow-2xl h-full">
+          <div class="text-7xl mb-8">📸</div>
+          <h2 class="text-4xl font-bold text-cyan-300 mb-6">Static Audit</h2>
+          <div class="space-y-4 mb-8">
+            <div class="flex items-center justify-center gap-3">
+              <div class="w-3 h-3 rounded-full bg-green-500"></div>
+              <p class="text-lg">Fast screenshots</p>
+            </div>
+            <div class="flex items-center justify-center gap-3">
+              <div class="w-3 h-3 rounded-full bg-green-500"></div>
+              <p class="text-lg">4 browsers supported</p>
+            </div>
+            <div class="flex items-center justify-center gap-3">
+              <div class="w-3 h-3 rounded-full bg-green-500"></div>
+              <p class="text-lg">Browser frames added</p>
+            </div>
+            <div class="flex items-center justify-center gap-3">
+              <div class="w-3 h-3 rounded-full bg-green-500"></div>
+              <p class="text-lg">Quick results</p>
+            </div>
+          </div>
+          <button class="px-10 py-4 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-xl font-bold text-xl hover:from-cyan-400 hover:to-blue-500">
+            Start Static Audit
+          </button>
+        </div>
+      </a>
+
+      <!-- Dynamic Audit Card -->
+      <a href="/responsive/dynamic" class="group">
+        <div class="glow-box bg-gradient-to-br from-blue-900/50 to-purple-900/50 backdrop-blur-lg border border-blue-500/30 rounded-3xl p-12 text-center transform transition-all duration-500 hover:scale-105 hover:shadow-2xl h-full">
+          <div class="text-7xl mb-8">🎬</div>
+          <h2 class="text-4xl font-bold text-blue-300 mb-6">Dynamic Audit</h2>
+          <div class="space-y-4 mb-8">
+            <div class="flex items-center justify-center gap-3">
+              <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+              <p class="text-lg">Interactive videos</p>
+            </div>
+            <div class="flex items-center justify-center gap-3">
+              <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+              <p class="text-lg">Chrome & Edge only</p>
+            </div>
+            <div class="flex items-center justify-center gap-3">
+              <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+              <p class="text-lg">Scrolling simulation</p>
+            </div>
+            <div class="flex items-center justify-center gap-3">
+              <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+              <p class="text-lg">Mouse movement</p>
+            </div>
+          </div>
+          <button class="px-10 py-4 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl font-bold text-xl hover:from-blue-400 hover:to-purple-500">
+            Start Dynamic Audit
+          </button>
+        </div>
+      </a>
+    </div>
+
+    <div class="text-center mt-16">
+      <a href="/" class="text-cyan-400 hover:text-cyan-300 text-lg hover:underline">
+        ← Back to Dashboard
+      </a>
+    </div>
+  </div>
+
+  <script>
+    function logout() {
+      document.cookie = "access_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+      window.location.href = "/login";
+    }
+  </script>
+</body>
+</html>

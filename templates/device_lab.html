@@ -1,0 +1,183 @@
+{% extends "base_platform.html" %}
+
+{% block content %}
+<div class="flex flex-col h-screen overflow-hidden">
+    <!-- Toolbar -->
+    <div class="h-16 bg-slate-900 border-b border-white/5 flex items-center px-6 gap-4 shrink-0 z-20">
+        <div class="flex items-center gap-2 mr-4 text-white font-semibold">
+            <i data-lucide="smartphone" class="w-5 h-5 text-blue-400"></i>
+            Device Lab
+        </div>
+
+        <div class="flex-1 max-w-2xl relative group">
+            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                <i data-lucide="globe" class="w-4 h-4"></i>
+            </div>
+            <input type="text" id="urlInput" placeholder="Enter URL to test (e.g., https://example.com)..."
+                class="w-full bg-slate-950 border border-white/10 text-slate-200 pl-10 pr-20 py-2 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all font-mono">
+            <button onclick="loadUrl()"
+                class="absolute right-1 top-1 h-8 px-4 bg-blue-600 hover:bg-blue-500 text-white rounded-md text-xs font-medium transition flex items-center gap-1">
+                GO <i data-lucide="arrow-right" class="w-3 h-3"></i>
+            </button>
+        </div>
+
+        <div class="h-8 w-px bg-white/10 mx-2"></div>
+
+        <div class="flex items-center bg-slate-800 rounded-lg p-1 border border-white/5">
+            <button onclick="setGrid('1')"
+                class="p-1.5 hover:bg-slate-700 rounded text-slate-400 hover:text-white transition" title="Single View">
+                <i data-lucide="smartphone" class="w-4 h-4"></i>
+            </button>
+            <button onclick="setGrid('2')"
+                class="p-1.5 hover:bg-slate-700 rounded text-slate-400 hover:text-white transition" title="Dual View">
+                <i data-lucide="columns" class="w-4 h-4"></i>
+            </button>
+            <button onclick="setGrid('3')"
+                class="p-1.5 hover:bg-slate-700 rounded text-slate-400 hover:text-white transition" title="Grid View">
+                <i data-lucide="grid" class="w-4 h-4"></i>
+            </button>
+        </div>
+
+        <button onclick="rotateDevices()"
+            class="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-blue-400 transition ml-auto border border-transparent hover:border-white/5 flex items-center gap-2 text-xs font-medium"
+            title="Rotate All">
+            <i data-lucide="rotate-cw" class="w-4 h-4"></i>
+            Rotate
+        </button>
+    </div>
+
+    <!-- Device Canvas -->
+    <div class="flex-1 overflow-auto p-12 bg-slate-950 relative custom-scrollbar">
+        <!-- Grid Pattern Background -->
+        <div class="absolute inset-0 opacity-[0.03] pointer-events-none"
+            style="background-image: linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px); background-size: 40px 40px;">
+        </div>
+
+        <div id="deviceGrid" class="flex flex-wrap gap-12 items-start justify-center relative z-10 pb-20">
+
+            <!-- iPhone 14 Pro -->
+            <div class="device-frame flex flex-col items-center gap-4 group">
+                <div class="text-xs text-slate-500 font-medium uppercase tracking-widest flex items-center gap-2">
+                    <i data-lucide="smartphone" class="w-3 h-3"></i> iPhone 14 Pro
+                </div>
+                <div class="relative bg-slate-900 rounded-[3rem] p-3 border-4 border-slate-800 shadow-2xl ring-1 ring-white/10 transition-transform duration-500 hover:scale-[1.02]"
+                    style="width: 380px;">
+                    <div class="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-7 bg-black rounded-b-2xl z-20"></div>
+                    <!-- Dynamic Island -->
+                    <div class="w-full h-[760px] bg-white rounded-[2rem] overflow-hidden relative">
+                        <iframe src="about:blank" class="w-full h-full border-0 test-frame bg-white"
+                            id="frame-mobile"></iframe>
+                    </div>
+                </div>
+            </div>
+
+            <!-- iPad Pro -->
+            <div class="device-frame flex flex-col items-center gap-4 group">
+                <div class="text-xs text-slate-500 font-medium uppercase tracking-widest flex items-center gap-2">
+                    <i data-lucide="tablet" class="w-3 h-3"></i> iPad Pro
+                </div>
+                <div class="relative bg-slate-900 rounded-[2rem] p-3 border-4 border-slate-800 shadow-2xl ring-1 ring-white/10 transition-transform duration-500 hover:scale-[1.01]"
+                    style="width: 580px;">
+                    <div class="w-full h-[780px] bg-white rounded-xl overflow-hidden">
+                        <iframe src="about:blank" class="w-full h-full border-0 test-frame bg-white"
+                            id="frame-tablet"></iframe>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Laptop -->
+            <div class="device-frame flex flex-col items-center gap-4 group">
+                <div class="text-xs text-slate-500 font-medium uppercase tracking-widest flex items-center gap-2">
+                    <i data-lucide="laptop" class="w-3 h-3"></i> MacBook Air
+                </div>
+                <div class="relative bg-slate-800 rounded-t-xl p-2 pb-0 shadow-2xl ring-1 ring-white/10"
+                    style="width: 700px;">
+                    <div class="w-full h-[450px] bg-white rounded-t lg overflow-hidden border border-slate-700">
+                        <iframe src="about:blank" class="w-full h-full border-0 test-frame bg-white"
+                            id="frame-desktop"></iframe>
+                    </div>
+                    <div class="w-full h-4 bg-slate-700 rounded-b mt-0.5 flex justify-center border-t border-slate-600">
+                        <div class="w-16 h-1 bg-slate-600 rounded-b-lg"></div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<script>
+    lucide.createIcons();
+    let currentRotation = 0;
+
+    function setGrid(layout) {
+        const mobile = document.querySelector('.device-frame:nth-child(1)');
+        const tablet = document.querySelector('.device-frame:nth-child(2)');
+        const laptop = document.querySelector('.device-frame:nth-child(3)');
+        const container = document.getElementById('deviceGrid');
+
+        // Reset display
+        mobile.style.display = 'flex';
+        tablet.style.display = 'flex';
+        laptop.style.display = 'flex';
+
+        if (layout === '1') {
+            // Single View - Mobile Only
+            tablet.style.display = 'none';
+            laptop.style.display = 'none';
+            container.className = 'flex flex-wrap gap-12 items-start justify-center relative z-10 pb-20';
+        } else if (layout === '2') {
+            // Dual View - Mobile + Tablet
+            laptop.style.display = 'none';
+            container.className = 'flex flex-wrap gap-12 items-start justify-center relative z-10 pb-20';
+        } else {
+            // Grid View - All (Default)
+            container.className = 'flex flex-wrap gap-12 items-start justify-center relative z-10 pb-20';
+        }
+    }
+
+    function loadUrl() {
+        let url = document.getElementById('urlInput').value.trim();
+        if (!url) return;
+
+        // Use proxy to avoid X-Frame-Options
+        const proxyUrl = `/api/proxy?url=${encodeURIComponent(url)}`;
+
+        // Update all iframes
+        document.querySelectorAll('.test-frame').forEach(frame => {
+            frame.src = proxyUrl;
+        });
+    }
+
+    function rotateDevices() {
+        currentRotation = currentRotation === 0 ? 90 : 0;
+        const frames = document.querySelectorAll('.device-frame');
+
+        frames.forEach(frame => {
+            const device = frame.querySelector('div:nth-child(2)');
+            if (!device || device.style.width === '700px') return; // Skip laptop
+
+            device.style.transition = 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)';
+
+            if (currentRotation === 90) {
+                const height = device.offsetHeight;
+                const width = device.offsetWidth; // Use offsetWidth to get actual rendered width
+                const diff = (height - width) / 2;
+
+                device.style.transform = 'rotate(90deg)';
+                // Add vertical margin to compensate for rotation swing
+                // Add horizontal margin to reserve space in the flow
+                device.style.margin = `${diff}px ${diff}px`;
+            } else {
+                device.style.transform = 'rotate(0deg)';
+                device.style.margin = '0';
+            }
+        });
+    }
+
+    // Allow Enter key
+    document.getElementById('urlInput').addEventListener('keypress', function (e) {
+        if (e.key === 'Enter') loadUrl();
+    });
+</script>
+{% endblock %}

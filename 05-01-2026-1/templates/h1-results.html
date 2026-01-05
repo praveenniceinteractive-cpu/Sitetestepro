@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>H1 Audit Results - {{ session.name }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="/static/style.css" rel="stylesheet" />
+    <style>
+        .status-good {
+            background-color: rgba(34, 197, 94, 0.2);
+            color: #22c55e;
+        }
+        .status-warning {
+            background-color: rgba(234, 179, 8, 0.2);
+            color: #eab308;
+        }
+        .status-error {
+            background-color: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen">
+    <!-- Navigation Bar -->
+    <nav class="bg-gray-800/80 backdrop-blur border-b border-gray-700">
+        <div class="container mx-auto px-6 py-4">
+            <div class="flex justify-between items-center">
+                <div class="text-xl font-bold text-purple-300">H1 Audit Results</div>
+                <div class="flex items-center gap-4">
+                    <a href="/profile" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition">
+                        ← Back to Profile
+                    </a>
+                    <a href="/" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition">Dashboard</a>
+                    <button onclick="logout()" class="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg transition">Logout</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mx-auto px-6 py-12 max-w-7xl">
+        <!-- Session Info -->
+        <div class="bg-gray-800/50 backdrop-blur rounded-2xl p-8 mb-10 border border-purple-500/30">
+            <h1 class="text-4xl font-bold text-purple-300 mb-4">{{ session.name }}</h1>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div>
+                    <p class="text-gray-400">Type</p>
+                    <p class="text-xl font-bold text-purple-400">{{ session.session_type|upper }} Audit</p>
+                </div>
+                <div>
+                    <p class="text-gray-400">Status</p>
+                    <span class="px-3 py-1 rounded-full text-sm bg-green-900/50 text-green-300">
+                        {{ session.status|title }}
+                    </span>
+                </div>
+                <div>
+                    <p class="text-gray-400">Created</p>
+                    <p class="text-lg">{{ session.created_at.strftime('%Y-%m-%d %H:%M') if session.created_at else 'N/A' }}</p>
+                </div>
+                <div class="md:col-span-3">
+                    <p class="text-gray-400">URLs Audited</p>
+                    <div class="flex flex-wrap gap-2 mt-2">
+                        {% for url in session.urls %}
+                        <span class="px-3 py-1 bg-gray-700/50 rounded text-sm text-gray-300">{{ url }}</span>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Summary Stats -->
+        {% if results %}
+        {# Calculate statistics using namespace to fix variable scoping #}
+        {% set total_pages = results|length %}
+        
+        {# Initialize namespace for counters (fixes Jinja2 scoping issue) #}
+        {% set ns = namespace(with_h1=0, without_h1=0, multiple_h1=0, total_h1_tags=0) %}
+        
+        {# Process each result #}
+        {% for result in results %}
+            {% set h1_count = result.h1_count %}
+            {% set ns.total_h1_tags = ns.total_h1_tags + h1_count %}
+            
+            {% if h1_count > 0 %}
+                {% set ns.with_h1 = ns.with_h1 + 1 %}
+                {% if h1_count > 1 %}
+                    {% set ns.multiple_h1 = ns.multiple_h1 + 1 %}
+                {% endif %}
+            {% else %}
+                {% set ns.without_h1 = ns.without_h1 + 1 %}
+            {% endif %}
+        {% endfor %}
+        
+        {# Calculate percentages #}
+        {% set with_h1_percent = (ns.with_h1 / total_pages * 100) if total_pages > 0 else 0 %}
+        {% set without_h1_percent = (ns.without_h1 / total_pages * 100) if total_pages > 0 else 0 %}
+        {% set multiple_h1_percent = (ns.multiple_h1 / total_pages * 100) if total_pages > 0 else 0 %}
+        
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-12">
+            <div class="bg-gray-800/50 rounded-2xl p-6 border border-purple-500/30">
+                <p class="text-gray-400 text-sm">Total Pages</p>
+                <p class="text-3xl font-bold text-purple-400">{{ total_pages }}</p>
+            </div>
+            <div class="bg-gray-800/50 rounded-2xl p-6 border border-green-500/30">
+                <p class="text-gray-400 text-sm">Pages with H1</p>
+                <p class="text-3xl font-bold text-green-400">{{ ns.with_h1 }}</p>
+                <p class="text-sm text-gray-400 mt-1">{{ with_h1_percent|round(1) }}%</p>
+            </div>
+            <div class="bg-gray-800/50 rounded-2xl p-6 border border-red-500/30">
+                <p class="text-gray-400 text-sm">Pages without H1</p>
+                <p class="text-3xl font-bold text-red-400">{{ ns.without_h1 }}</p>
+                <p class="text-sm text-gray-400 mt-1">{{ without_h1_percent|round(1) }}%</p>
+            </div>
+            <div class="bg-gray-800/50 rounded-2xl p-6 border border-yellow-500/30">
+                <p class="text-gray-400 text-sm">Multiple H1 Pages</p>
+                <p class="text-3xl font-bold text-yellow-400">{{ ns.multiple_h1 }}</p>
+                <p class="text-sm text-gray-400 mt-1">{{ multiple_h1_percent|round(1) }}%</p>
+            </div>
+        </div>
+
+        <!-- Detailed Results -->
+        <div class="bg-gray-800/30 backdrop-blur rounded-2xl p-6 border border-gray-700/50">
+            <h3 class="text-2xl font-bold text-purple-300 mb-6">Detailed Results</h3>
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead>
+                        <tr class="text-left border-b border-gray-700">
+                            <th class="pb-3 px-4">URL</th>
+                            <th class="pb-3 px-4">H1 Count</th>
+                            <th class="pb-3 px-4">Status</th>
+                            <th class="pb-3 px-4">H1 Texts</th>
+                            <th class="pb-3 px-4">Issues</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for result in results %}
+                        {# Parse JSON strings using custom filter #}
+                        {% set h1_texts = result.h1_texts|from_json %}
+                        {% set issues = result.issues|from_json %}
+                        
+                        {# Determine status #}
+                        {% if result.h1_count == 0 %}
+                            {% set status_class = 'status-error' %}
+                            {% set status_text = 'No H1' %}
+                        {% elif result.h1_count == 1 %}
+                            {% set status_class = 'status-good' %}
+                            {% set status_text = 'Good' %}
+                        {% else %}
+                            {% set status_class = 'status-warning' %}
+                            {% set status_text = 'Multiple H1' %}
+                        {% endif %}
+                        
+                        <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+                            <td class="py-4 px-4">
+                                <div class="font-medium truncate max-w-xs">{{ result.url }}</div>
+                            </td>
+                            <td class="py-4 px-4">
+                                <span class="px-3 py-1 rounded-full text-lg font-bold">{{ result.h1_count }}</span>
+                            </td>
+                            <td class="py-4 px-4">
+                                <span class="px-3 py-1 rounded-full text-sm {{ status_class }}">
+                                    {{ status_text }}
+                                </span>
+                            </td>
+                            <td class="py-4 px-4">
+                                {% if h1_texts and h1_texts|length > 0 %}
+                                    <div class="max-w-xs">
+                                        {% for text in h1_texts %}
+                                        <p class="text-sm text-gray-300 mb-1">"{{ text[:60] }}{% if text|length > 60 %}...{% endif %}"</p>
+                                        {% endfor %}
+                                    </div>
+                                {% else %}
+                                    <p class="text-gray-400 text-sm">No H1 tags found</p>
+                                {% endif %}
+                            </td>
+                            <td class="py-4 px-4">
+                                {% if issues and issues|length > 0 %}
+                                    <div class="max-w-xs">
+                                        {% for issue in issues %}
+                                        <p class="text-sm text-yellow-300 mb-1">{{ issue }}</p>
+                                        {% endfor %}
+                                    </div>
+                                {% else %}
+                                    <p class="text-gray-400 text-sm">No issues</p>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <!-- Export Button -->
+        <div class="mt-8 text-center">
+            <button onclick="exportResults()" class="px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-400 hover:to-pink-500 rounded-xl font-bold text-lg">
+                Export Results as CSV
+            </button>
+        </div>
+        
+        <!-- Add CSV export script -->
+        <script>
+            function exportResults() {
+                // This data will be populated by the template rendering
+                // We'll get it from a data attribute on the button instead
+                const sessionId = "{{ session.session_id }}";
+                
+                // Create a simple export without complex Jinja2 in JavaScript
+                const rows = [['URL', 'H1 Count', 'Status', 'H1 Texts', 'Issues']];
+                
+                // Get all table rows and extract data
+                const tableRows = document.querySelectorAll('tbody tr');
+                
+                tableRows.forEach(row => {
+                    const cells = row.querySelectorAll('td');
+                    if (cells.length >= 5) {
+                        const url = cells[0].querySelector('div').textContent.trim();
+                        const h1Count = cells[1].querySelector('span').textContent.trim();
+                        const status = cells[2].querySelector('span').textContent.trim();
+                        
+                        // Get H1 texts
+                        const h1TextElements = cells[3].querySelectorAll('p');
+                        let h1Texts = '';
+                        h1TextElements.forEach(p => {
+                            const text = p.textContent.replace(/"/g, '""').trim();
+                            if (text && text !== 'No H1 tags found') {
+                                h1Texts += (h1Texts ? '; ' : '') + text.replace(/^"|"$/g, '');
+                            }
+                        });
+                        
+                        // Get issues
+                        const issueElements = cells[4].querySelectorAll('p');
+                        let issues = '';
+                        issueElements.forEach(p => {
+                            const text = p.textContent.replace(/"/g, '""').trim();
+                            if (text && text !== 'No issues') {
+                                issues += (issues ? '; ' : '') + text;
+                            }
+                        });
+                        
+                        rows.push([
+                            `"${url}"`,
+                            `"${h1Count}"`,
+                            `"${status}"`,
+                            `"${h1Texts}"`,
+                            `"${issues}"`
+                        ]);
+                    }
+                });
+                
+                // Convert to CSV
+                const csvContent = rows.map(row => row.join(',')).join('\n');
+                
+                // Create download link
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.setAttribute('href', url);
+                link.setAttribute('download', `h1-audit-results-${sessionId}.csv`);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+        </script>
+        
+        {% else %}
+        <div class="text-center py-12">
+            <p class="text-2xl text-gray-400">No results found for this session.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <script>
+        function logout() {
+            document.cookie = "access_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+            window.location.href = "/login";
+        }
+    </script>
+</body>
+</html>

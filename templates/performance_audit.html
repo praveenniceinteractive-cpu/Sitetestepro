@@ -1,0 +1,111 @@
+{% extends "base_platform.html" %}
+
+{% block content %}
+<div class="p-8 max-w-6xl mx-auto">
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-white mb-2">Performance Audit</h1>
+        <p class="text-gray-400">Analyze page load metrics (TTFB, LCP, CLS) across your pages.</p>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <!-- Input Form -->
+        <div class="glass-panel p-6 rounded-xl h-fit">
+            <h3 class="text-lg font-bold text-white mb-4">New Scan</h3>
+            <form id="performance-form" action="/api/performance-test" method="POST">
+                <label class="block text-sm font-medium text-gray-400 mb-2">URLs to Scan (One per line)</label>
+                <textarea name="urls" rows="6"
+                    class="w-full bg-gray-900 border border-gray-700 text-white px-4 py-3 rounded-lg focus:ring-2 focus:ring-green-500 outline-none mb-4 font-mono text-sm"
+                    placeholder="https://example.com/&#10;https://example.com/about" required></textarea>
+
+                <button type="submit"
+                    class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2.5 rounded-lg transition shadow-lg shadow-green-500/20">
+                    Start Analysis
+                </button>
+            </form>
+        </div>
+
+        <!-- Recent Checks -->
+        <div class="lg:col-span-2 glass-panel p-6 rounded-xl">
+            <h3 class="text-lg font-bold text-white mb-4">Latest Reports</h3>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-left">
+                    <thead>
+                        <tr class="text-gray-500 border-b border-gray-800">
+                            <th class="pb-3 text-sm font-medium">URL</th>
+                            <th class="pb-3 text-sm font-medium">Score</th>
+                            <th class="pb-3 text-sm font-medium">TTFB</th>
+                            <th class="pb-3 text-sm font-medium">Load Time</th>
+                            <th class="pb-3 text-sm font-medium">Date</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-gray-300">
+                        {% if recent_results %}
+                        {% for result in recent_results %}
+                        <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+                            <td class="py-4 truncate max-w-xs text-white">{{ result.url }}</td>
+                            <td class="py-4">
+                                <span
+                                    class="px-2 py-1 rounded {% if result.score >= 80 %}bg-green-500/20 text-green-300{% elif result.score >= 60 %}bg-yellow-500/20 text-yellow-300{% else %}bg-red-500/20 text-red-300{% endif %} text-xs font-bold">
+                                    {{ result.score }}
+                                </span>
+                            </td>
+                            <td class="py-4">{{ result.ttfb }}ms</td>
+                            <td class="py-4">{{ "%.2f"|format(result.page_load / 1000) }}s</td>
+                            <td class="py-4 text-gray-500 text-sm">Just now</td>
+                        </tr>
+                        {% endfor %}
+                        {% else %}
+                        <tr>
+                            <td colspan="5" class="py-8 text-center text-gray-500">
+                                No performance audits yet. Start your first scan above!
+                            </td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+    const form = document.getElementById('performance-form');
+
+    form.addEventListener('submit', function (e) {
+        const urlsTextarea = document.querySelector('textarea[name="urls"]');
+        const urls = urlsTextarea.value.trim();
+
+        if (!urls) {
+            e.preventDefault();
+            Swal.fire({
+                icon: 'info',
+                title: 'URLs Required',
+                text: 'Please enter at least one URL to scan.',
+                background: '#0f172a',
+                color: '#f8fafc',
+                confirmButtonColor: '#10b981'
+            });
+            return false;
+        }
+
+        const urlList = urls.split('\n').filter(u => u.trim());
+        if (urlList.length === 0) {
+            e.preventDefault();
+            Swal.fire({
+                icon: 'info',
+                title: 'Valid URLs Required',
+                text: 'Please enter at least one valid URL.',
+                background: '#0f172a',
+                color: '#f8fafc',
+                confirmButtonColor: '#10b981'
+            });
+            return false;
+        }
+
+        // Form is valid, allow submission
+        return true;
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,80 @@
+{% extends "base_platform.html" %}
+
+{% block content %}
+<div class="p-8 max-w-5xl mx-auto">
+    <div class="glass-panel p-8 rounded-2xl border border-white/5 relative overflow-hidden mb-8">
+
+        <div class="relative z-10 mb-8">
+            <div
+                class="w-16 h-16 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center shadow-xl shadow-amber-500/10 mb-6 border border-amber-500/20">
+                <i data-lucide="accessibility" class="w-8 h-8"></i>
+            </div>
+            <h2 class="text-3xl font-semibold text-white mb-2">Accessibility Audit</h2>
+            <p class="text-slate-400 max-w-xl text-lg">
+                Ensure your website is accessible to everyone. Our automated audit checks for WCAG 2.1 violations using
+                the industry-standard axe-core engine.
+            </p>
+        </div>
+
+        <form action="/api/accessibility-test" method="POST" class="space-y-6 relative z-10">
+            <div>
+                <label class="block text-sm font-medium text-slate-400 mb-2 uppercase tracking-wider">URLs to Audit (One
+                    per line)</label>
+                <div class="relative">
+                    <textarea name="urls" rows="5"
+                        class="w-full bg-slate-950/50 border border-white/10 rounded-xl p-4 text-slate-200 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all font-mono text-sm leading-relaxed placeholder-slate-600"
+                        placeholder="https://example.com&#10;https://example.com/about"></textarea>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-4 pt-2">
+                <button type="submit"
+                    class="bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white pl-6 pr-8 py-3.5 rounded-xl font-medium transition-all transform hover:scale-[1.02] shadow-lg shadow-amber-500/20 flex items-center gap-2 group">
+                    <span class="bg-white/20 p-1 rounded-md group-hover:bg-white/30 transition">
+                        <i data-lucide="search" class="w-4 h-4 text-white fill-current"></i>
+                    </span>
+                    Start Accessibility Audit
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Info Section -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="glass-panel p-6 rounded-xl border border-white/5 bg-slate-900/40">
+            <h3 class="font-semibold text-white mb-2 flex items-center gap-2">
+                <div class="w-2 h-2 rounded-full bg-red-500"></div> Critical Issues
+            </h3>
+            <p class="text-sm text-slate-400">Blocks users from accessing content or features completely.</p>
+        </div>
+        <div class="glass-panel p-6 rounded-xl border border-white/5 bg-slate-900/40">
+            <h3 class="font-semibold text-white mb-2 flex items-center gap-2">
+                <div class="w-2 h-2 rounded-full bg-amber-500"></div> Serious Issues
+            </h3>
+            <p class="text-sm text-slate-400">Significant barriers that cause frustration for assistive tech users.</p>
+        </div>
+        <div class="glass-panel p-6 rounded-xl border border-white/5 bg-slate-900/40">
+            <h3 class="font-semibold text-white mb-2 flex items-center gap-2">
+                <div class="w-2 h-2 rounded-full bg-blue-500"></div> best Practices
+            </h3>
+            <p class="text-sm text-slate-400">Checks against WCAG 2.0, 2.1 Level A and AA standards.</p>
+        </div>
+    </div>
+</div>
+
+<script>
+    lucide.createIcons();
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('status') === 'started') {
+        Swal.fire({
+            icon: 'success',
+            title: 'Audit Started',
+            text: 'Accessibility audit is running. Check your dashboard for upgrades.',
+            background: '#0f172a',
+            color: '#f8fafc',
+            timer: 3000,
+            showConfirmButton: false
+        });
+    }
+</script>
+{% endblock %}

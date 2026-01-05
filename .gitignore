@@ -1,0 +1,15 @@
+.env
+venv/
+__pycache__/
+*.pyc
+screenshots/
+videos/
+database/
+temp_frames/
+diffs/
+db_dump.txt
+check_db.py
+setup_storage.py
+responsive.py
+responsive4.py
+.DS_Store

@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Static Responsive Audit</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="/static/style.css" rel="stylesheet" />
+</head>
+
+<body class="bg-gray-900 text-white min-h-screen">
+  <!-- Navigation Bar -->
+  <nav class="bg-gray-800/80 backdrop-blur border-b border-gray-700">
+    <div class="container mx-auto px-6 py-4">
+      <div class="flex justify-between items-center">
+        <div class="text-xl font-bold text-cyan-300">Static Audit</div>
+        <div class="flex items-center gap-4">
+          <a href="/responsive" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition">← Back</a>
+          <a href="/" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition">Dashboard</a>
+          <button onclick="logout()" class="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg transition">Logout</button>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container mx-auto px-6 py-12 max-w-7xl">
+    <h1 class="text-5xl font-bold mb-2 text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-600">
+      Static Responsive Audit
+    </h1>
+    <p class="text-gray-400 text-lg mb-8">Fast screenshots across browsers & resolutions</p>
+
+    <!-- UPLOAD & OPTIONS -->
+    <div id="upload-section">
+      <form id="upload-form" class="max-w-4xl mx-auto">
+        <div id="drop-zone"
+          class="border-4 border-dashed border-cyan-500/50 rounded-3xl p-20 text-center cursor-pointer hover:border-cyan-400 transition-all bg-gray-800/50 mb-10">
+          <div class="text-7xl mb-6">📁</div>
+          <p class="text-xl text-gray-300">Drop your <strong>urls.txt</strong> here<br>or click to browse</p>
+          <input type="file" id="file-input" accept=".txt" class="hidden" required />
+        </div>
+
+        <!-- Session Name -->
+        <div class="bg-gray-800/70 rounded-3xl p-8 mb-8">
+          <h3 class="text-2xl font-bold text-cyan-300 mb-6">Session Name</h3>
+          <input type="text" name="session_name" placeholder="My Static Audit Session" value="My Static Audit Session"
+            class="w-full px-6 py-4 bg-gray-700/50 border border-gray-600 rounded-xl text-xl focus:outline-none focus:border-cyan-500">
+        </div>
+
+        <!-- Browser Selection -->
+        <div class="bg-gray-800/70 rounded-3xl p-8 mb-8">
+          <h3 class="text-2xl font-bold text-cyan-300 mb-6">Select Browsers</h3>
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
+            <label class="flex items-center space-x-3 cursor-pointer"><input type="checkbox" name="browser"
+                value="Chrome" checked class="w-6 h-6 text-cyan-500"><span class="text-lg">Chrome</span></label>
+            <label class="flex items-center space-x-3 cursor-pointer"><input type="checkbox" name="browser" value="Edge"
+                checked class="w-6 h-6 text-cyan-500"><span class="text-lg">Edge</span></label>
+            <label class="flex items-center space-x-3 cursor-pointer"><input type="checkbox" name="browser"
+                value="Firefox" checked class="w-6 h-6 text-cyan-500"><span class="text-lg">Firefox</span></label>
+            <label class="flex items-center space-x-3 cursor-pointer"><input type="checkbox" name="browser"
+                value="Safari" checked class="w-6 h-6 text-cyan-500"><span class="text-lg">Safari</span></label>
+          </div>
+        </div>
+
+        <!-- Resolution Selection -->
+        <div class="bg-gray-800/70 rounded-3xl p-8 mb-10">
+          <h3 class="text-2xl font-bold text-cyan-300 mb-6">Select Resolutions</h3>
+          <div class="grid grid-cols-2 md:grid-cols-3 gap-6">
+            <label class="flex items-center space-x-3 cursor-pointer"><input type="checkbox" name="resolution"
+                value="1920x1080" checked class="w-5 h-5 text-cyan-500"><span>Desktop (1920×1080)</span></label>
+            <label class="flex items-center space-x-3 cursor-pointer"><input type="checkbox" name="resolution"
+                value="1440x900" checked class="w-5 h-5 text-cyan-500"><span>Laptop (1440×900)</span></label>
+            <label class="flex items-center space-x-3 cursor-pointer"><input type="checkbox" name="resolution"
+                value="1366x768" checked class="w-5 h-5 text-cyan-500"><span>Laptop (1366×768)</span></label>
+            <label class="flex items-center space-x-3 cursor-pointer"><input type="checkbox" name="resolution"
+                value="1280x1024" checked class="w-5 h-5 text-cyan-500"><span>Laptop (1280×1024)</span></label>
+            <label class="flex items-center space-x-3 cursor-pointer"><input type="checkbox" name="resolution"
+                value="1024x768" checked class="w-5 h-5 text-cyan-500"><span>Old Desktop (1024×768)</span></label>
+            <label class="flex items-center space-x-3 cursor-pointer"><input type="checkbox" name="resolution"
+                value="900x1440" checked class="w-5 h-5 text-cyan-500"><span>Tablet Portrait (900×1440)</span></label>
+            <label class="flex items-center space-x-3 cursor-pointer"><input type="checkbox" name="resolution"
+                value="768x1024" checked class="w-5 h-5 text-cyan-500"><span>Tablet Landscape (768×1024)</span></label>
+            <label class="flex items-center space-x-3 cursor-pointer"><input type="checkbox" name="resolution"
+                value="480x800" checked class="w-5 h-5 text-cyan-500"><span>Mobile (480×800)</span></label>
+          </div>
+        </div>
+
+        <button type="submit"
+          class="w-full py-6 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-2xl font-bold text-3xl hover:from-cyan-400 hover:to-blue-500 shadow-2xl">
+          Start Static Audit
+        </button>
+      </form>
+    </div>
+
+    <!-- PROGRESS -->
+    <div id="progress-section" class="hidden">
+      <div class="bg-gray-800/90 backdrop-blur rounded-3xl p-12 shadow-2xl max-w-5xl mx-auto">
+        <h2 class="text-4xl font-bold text-cyan-400 mb-10 text-center">Capturing Screenshots...</h2>
+        <div class="w-full bg-gray-700 rounded-full h-16 mb-8 overflow-hidden">
+          <div id="progress-bar"
+            class="bg-gradient-to-r from-cyan-500 to-blue-600 h-full text-right pr-8 text-2xl font-bold text-white flex items-center justify-end"
+            style="width: 0%">
+            0%
+          </div>
+        </div>
+        <p id="status-text" class="text-center text-2xl text-gray-300">Initializing browsers...</p>
+        <div class="mt-6 text-center">
+          <button id="stop-button" class="px-8 py-3 bg-red-600 hover:bg-red-700 rounded-xl font-bold text-lg hidden"
+            onclick="stopSession()">
+            Stop Session
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- RESULTS -->
+    <div id="results-section" class="hidden mt-12">
+      <h2 class="text-4xl font-bold text-center mb-12 text-cyan-400">Static Audit Results</h2>
+      <div class="flex justify-center gap-8 mb-12 flex-wrap" id="browser-tabs-container">
+        <!-- Browser tabs will be inserted here -->
+      </div>
+      <div id="content-area" class="min-h-screen"></div>
+    </div>
+  </div>
+
+  <script src="/static/static-script.js"></script>
+  <script>
+    function logout() {
+      document.cookie = "access_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+      window.location.href = "/login";
+    }
+  </script>
+</body>
+
+</html>

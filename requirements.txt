@@ -1,0 +1,21 @@
+# requirements.txt
+fastapi
+uvicorn
+playwright
+pillow
+imageio
+numpy
+python-multipart
+jinja2
+sqlalchemy
+databases[aiosqlite]
+python-jose[cryptography]
+passlib[bcrypt]
+httpx
+phonenumbers
+phonenumbers
+argon2-cffi
+supabase
+psycopg2-binary
+asyncpg
+python-dotenv

@@ -1,0 +1,103 @@
+{% extends "base_platform.html" %}
+
+{% block content %}
+<div class="p-8 max-w-7xl mx-auto h-full flex flex-col justify-center">
+  <div class="text-center mb-12">
+    <h1 class="text-4xl font-bold text-white tracking-tight mb-4">Cross-Browser Audit</h1>
+    <p class="text-xl text-slate-400">Choose your testing methodology</p>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto w-full">
+    <!-- Static Audit Card -->
+    <a href="/responsive/static" class="group block h-full">
+      <div
+        class="glass-panel p-10 rounded-2xl h-full border border-white/5 hover:border-cyan-500/30 hover:bg-slate-900/80 transition-all duration-300 transform hover:-translate-y-1 hover:shadow-2xl hover:shadow-cyan-500/10 relative overflow-hidden">
+        <div
+          class="absolute top-0 right-0 p-32 bg-cyan-500/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none group-hover:bg-cyan-500/10 transition">
+        </div>
+
+        <div
+          class="w-20 h-20 rounded-2xl bg-cyan-500/10 text-cyan-400 flex items-center justify-center mb-6 mx-auto group-hover:scale-110 transition duration-300">
+          <i data-lucide="camera" class="w-10 h-10"></i>
+        </div>
+
+        <h2 class="text-2xl font-bold text-white mb-4 text-center group-hover:text-cyan-400 transition">Static Snapshots
+        </h2>
+        <p class="text-slate-400 text-center mb-8 leading-relaxed">
+          Capture full-page screenshots across multiple browsers (Chrome, Firefox, Safari) and device resolutions
+          instantly.
+        </p>
+
+        <ul class="space-y-4 mb-10 text-slate-300 max-w-xs mx-auto">
+          <li class="flex items-center gap-3">
+            <i data-lucide="check-circle" class="w-5 h-5 text-cyan-500"></i>
+            <span>4 Major Browsers</span>
+          </li>
+          <li class="flex items-center gap-3">
+            <i data-lucide="check-circle" class="w-5 h-5 text-cyan-500"></i>
+            <span>6+ Device Resolutions</span>
+          </li>
+          <li class="flex items-center gap-3">
+            <i data-lucide="check-circle" class="w-5 h-5 text-cyan-500"></i>
+            <span>Auto-generated frames</span>
+          </li>
+        </ul>
+
+        <div class="text-center">
+          <span
+            class="inline-flex items-center gap-2 px-6 py-3 bg-cyan-600 hover:bg-cyan-500 text-white font-medium rounded-lg transition-all shadow-lg shadow-cyan-500/20 group-hover:shadow-cyan-500/40">
+            Start Static Scan
+            <i data-lucide="arrow-right" class="w-4 h-4"></i>
+          </span>
+        </div>
+      </div>
+    </a>
+
+    <!-- Dynamic Audit Card -->
+    <a href="/responsive/dynamic" class="group block h-full">
+      <div
+        class="glass-panel p-10 rounded-2xl h-full border border-white/5 hover:border-blue-500/30 hover:bg-slate-900/80 transition-all duration-300 transform hover:-translate-y-1 hover:shadow-2xl hover:shadow-blue-500/10 relative overflow-hidden">
+        <div
+          class="absolute top-0 right-0 p-32 bg-blue-500/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none group-hover:bg-blue-500/10 transition">
+        </div>
+
+        <div
+          class="w-20 h-20 rounded-2xl bg-blue-500/10 text-blue-400 flex items-center justify-center mb-6 mx-auto group-hover:scale-110 transition duration-300">
+          <i data-lucide="video" class="w-10 h-10"></i>
+        </div>
+
+        <h2 class="text-2xl font-bold text-white mb-4 text-center group-hover:text-blue-400 transition">Dynamic
+          Recording</h2>
+        <p class="text-slate-400 text-center mb-8 leading-relaxed">
+          Record video sessions of your site simulating scrolling, clicking, and user interactions to catch layout
+          shifts.
+        </p>
+
+        <ul class="space-y-4 mb-10 text-slate-300 max-w-xs mx-auto">
+          <li class="flex items-center gap-3">
+            <i data-lucide="check-circle" class="w-5 h-5 text-blue-500"></i>
+            <span>Real video playback</span>
+          </li>
+          <li class="flex items-center gap-3">
+            <i data-lucide="check-circle" class="w-5 h-5 text-blue-500"></i>
+            <span>Scroll & Interaction Sim</span>
+          </li>
+          <li class="flex items-center gap-3">
+            <i data-lucide="check-circle" class="w-5 h-5 text-blue-500"></i>
+            <span>Detect Layout Shifts (CLS)</span>
+          </li>
+        </ul>
+
+        <div class="text-center">
+          <span
+            class="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-lg transition-all shadow-lg shadow-blue-500/20 group-hover:shadow-blue-500/40">
+            Start Dynamic Scan
+            <i data-lucide="arrow-right" class="w-4 h-4"></i>
+          </span>
+        </div>
+      </div>
+    </a>
+  </div>
+</div>
+<script>lucide.createIcons();</script>
+{% endblock %}

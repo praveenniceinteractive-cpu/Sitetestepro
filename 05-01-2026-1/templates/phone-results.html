@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phone Audit Results - {{ session.name }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="/static/style.css" rel="stylesheet" />
+    <style>
+        .status-good {
+            background-color: rgba(34, 197, 94, 0.2);
+            color: #22c55e;
+        }
+
+        .status-warning {
+            background-color: rgba(234, 179, 8, 0.2);
+            color: #eab308;
+        }
+
+        .status-error {
+            background-color: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-900 text-white min-h-screen">
+    <!-- Navigation Bar -->
+    <nav class="bg-gray-800/80 backdrop-blur border-b border-gray-700">
+        <div class="container mx-auto px-6 py-4">
+            <div class="flex justify-between items-center">
+                <div class="text-xl font-bold text-green-300">Phone Audit Results</div>
+                <div class="flex items-center gap-4">
+                    <a href="/profile" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition">
+                        ← Back to Profile
+                    </a>
+                    <a href="/" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition">Dashboard</a>
+                    <button onclick="logout()"
+                        class="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg transition">Logout</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mx-auto px-6 py-12 max-w-7xl">
+        <!-- Session Info -->
+        <div class="bg-gray-800/50 backdrop-blur rounded-2xl p-8 mb-10 border border-green-500/30">
+            <h1 class="text-4xl font-bold text-green-300 mb-4">{{ session.name }}</h1>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div>
+                    <p class="text-gray-400">Type</p>
+                    <p class="text-xl font-bold text-green-400">{{ session.session_type|upper }} Audit</p>
+                </div>
+                <div>
+                    <p class="text-gray-400">Status</p>
+                    <span class="px-3 py-1 rounded-full text-sm bg-green-900/50 text-green-300">
+                        {{ session.status|title }}
+                    </span>
+                </div>
+                <div>
+                    <p class="text-gray-400">Created</p>
+                    <p class="text-lg">{{ session.created_at.strftime('%Y-%m-%d %H:%M') if session.created_at else 'N/A'
+                        }}</p>
+                </div>
+                <div class="md:col-span-3">
+                    <p class="text-gray-400">URLs Audited</p>
+                    <div class="flex flex-wrap gap-2 mt-2">
+                        {% for url in session.urls %}
+                        <span class="px-3 py-1 bg-gray-700/50 rounded text-sm text-gray-300">{{ url }}</span>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Summary Stats -->
+        {% if results %}
+        {# Calculate statistics #}
+        {% set total_pages = results|length %}
+        {% set total_phones = results|sum(attribute='phone_count') %}
+
+        {# Initialize counters #}
+        {% set pages_with_phones = 0 %}
+        {% set pages_without_phones = 0 %}
+        {% set pages_with_issues = 0 %}
+
+        {# Process each result #}
+        {% for result in results %}
+        {% set phone_count = result.phone_count %}
+        {% if phone_count > 0 %}
+        {% set pages_with_phones = pages_with_phones + 1 %}
+        {% else %}
+        {% set pages_without_phones = pages_without_phones + 1 %}
+        {% endif %}
+
+        {% set issues = result.issues|from_json %}
+        {% if issues|length > 0 %}
+        {% set pages_with_issues = pages_with_issues + 1 %}
+        {% endif %}
+        {% endfor %}
+
+        {# Calculate percentages #}
+        {% set with_phones_percent = (pages_with_phones / total_pages * 100) if total_pages > 0 else 0 %}
+        {% set without_phones_percent = (pages_without_phones / total_pages * 100) if total_pages > 0 else 0 %}
+        {% set issues_percent = (pages_with_issues / total_pages * 100) if total_pages > 0 else 0 %}
+        {% set avg_phones_per_page = (total_phones / total_pages) if total_pages > 0 else 0 %}
+
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-12">
+            <div class="bg-gray-800/50 rounded-2xl p-6 border border-green-500/30">
+                <p class="text-gray-400 text-sm">Total Pages</p>
+                <p class="text-3xl font-bold text-green-400">{{ total_pages }}</p>
+            </div>
+            <div class="bg-gray-800/50 rounded-2xl p-6 border border-teal-500/30">
+                <p class="text-gray-400 text-sm">Pages with Phones</p>
+                <p class="text-3xl font-bold text-teal-400">{{ pages_with_phones }}</p>
+                <p class="text-sm text-gray-400 mt-1">{{ with_phones_percent|round(1) }}%</p>
+            </div>
+            <div class="bg-gray-800/50 rounded-2xl p-6 border border-blue-500/30">
+                <p class="text-gray-400 text-sm">Total Phone Numbers</p>
+                <p class="text-3xl font-bold text-blue-400">{{ total_phones }}</p>
+                <p class="text-sm text-gray-400 mt-1">{{ avg_phones_per_page|round(1) }} per page</p>
+            </div>
+            <div class="bg-gray-800/50 rounded-2xl p-6 border border-yellow-500/30">
+                <p class="text-gray-400 text-sm">Pages with Issues</p>
+                <p class="text-3xl font-bold text-yellow-400">{{ pages_with_issues }}</p>
+                <p class="text-sm text-gray-400 mt-1">{{ issues_percent|round(1) }}%</p>
+            </div>
+        </div>
+
+        <!-- Detailed Results -->
+        <div class="bg-gray-800/30 backdrop-blur rounded-2xl p-6 border border-gray-700/50">
+            <h3 class="text-2xl font-bold text-green-300 mb-6">Detailed Results</h3>
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead>
+                        <tr class="text-left border-b border-gray-700">
+                            <th class="pb-3 px-4">URL</th>
+                            <th class="pb-3 px-4">Phone Count</th>
+                            <th class="pb-3 px-4">Status</th>
+                            <th class="pb-3 px-4">Phone Numbers Found</th>
+                            <th class="pb-3 px-4">Formats</th>
+                            <th class="pb-3 px-4">Issues</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for result in results %}
+                        {# Parse JSON strings using custom filter #}
+                        {% set phone_numbers = result.phone_numbers|from_json %}
+                        {% set formats_detected = result.formats_detected|from_json %}
+                        {% set issues = result.issues|from_json %}
+
+                        {# Determine status #}
+                        {% if result.phone_count == 0 %}
+                        {% set status_class = 'status-error' %}
+                        {% set status_text = 'No Phones' %}
+                        {% elif issues|length == 0 %}
+                        {% set status_class = 'status-good' %}
+                        {% set status_text = 'Good' %}
+                        {% else %}
+                        {% set status_class = 'status-warning' %}
+                        {% set status_text = 'Issues Found' %}
+                        {% endif %}
+
+                        <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+                            <td class="py-4 px-4">
+                                <div class="font-medium truncate max-w-xs">{{ result.url }}</div>
+                            </td>
+                            <td class="py-4 px-4">
+                                <span
+                                    class="px-3 py-1 rounded-full text-lg font-bold 
+                                    {% if result.phone_count > 0 %}bg-green-900/50 text-green-300{% else %}bg-red-900/50 text-red-300{% endif %}">
+                                    {{ result.phone_count }}
+                                </span>
+                            </td>
+                            <td class="py-4 px-4">
+                                <span class="px-3 py-1 rounded-full text-sm {{ status_class }}">
+                                    {{ status_text }}
+                                </span>
+                            </td>
+                            <td class="py-4 px-4">
+                                {% if phone_numbers and phone_numbers|length > 0 %}
+                                <div class="max-w-xs">
+                                    {% for phone_item in phone_numbers %}
+                                    {% if phone_item is mapping %}
+                                    {# New format: Dict with number and location #}
+                                    <div class="flex items-center gap-2 mb-1">
+                                        <span class="text-sm text-gray-300">{{ phone_item.number }}</span>
+                                        {% if phone_item.location == 'Header' %}
+                                        <span
+                                            class="px-1.5 py-0.5 rounded textxs bg-purple-900/50 text-purple-300 border border-purple-500/30 text-[10px]">Header</span>
+                                        {% elif phone_item.location == 'Footer' %}
+                                        <span
+                                            class="px-1.5 py-0.5 rounded text-xs bg-indigo-900/50 text-indigo-300 border border-indigo-500/30 text-[10px]">Footer</span>
+                                        {% elif phone_item.location == 'Schema' %}
+                                        <span
+                                            class="px-1.5 py-0.5 rounded text-xs bg-gray-700 text-gray-400 border border-gray-600 text-[10px]">Schema</span>
+                                        {% endif %}
+                                    </div>
+                                    {% else %}
+                                    {# Old format: String #}
+                                    <p class="text-sm text-gray-300 mb-1">{{ phone_item }}</p>
+                                    {% endif %}
+                                    {% endfor %}
+                                </div>
+                                {% else %}
+                                <p class="text-gray-400 text-sm">No phone numbers found</p>
+                                {% endif %}
+                            </td>
+                            <td class="py-4 px-4">
+                                {% if formats_detected and formats_detected|length > 0 %}
+                                <div class="max-w-xs">
+                                    {% for format in formats_detected %}
+                                    <span
+                                        class="inline-block px-2 py-1 bg-gray-700/50 rounded text-xs text-gray-300 mb-1 mr-1">
+                                        {{ format }}
+                                    </span>
+                                    {% endfor %}
+                                </div>
+                                {% else %}
+                                <p class="text-gray-400 text-sm">No formats detected</p>
+                                {% endif %}
+                            </td>
+                            <td class="py-4 px-4">
+                                {% if issues and issues|length > 0 %}
+                                <div class="max-w-xs">
+                                    {% for issue in issues %}
+                                    <p class="text-sm text-yellow-300 mb-1">{{ issue }}</p>
+                                    {% endfor %}
+                                </div>
+                                {% else %}
+                                <p class="text-gray-400 text-sm">No issues</p>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Export Button -->
+        <div class="mt-8 text-center">
+            <button onclick="exportResults()"
+                class="px-6 py-3 bg-gradient-to-r from-green-500 to-teal-600 hover:from-green-400 hover:to-teal-500 rounded-xl font-bold text-lg">
+                Export Results as CSV
+            </button>
+        </div>
+
+        <!-- Add CSV export script -->
+        <script>
+            function exportResults() {
+                const sessionId = "{{ session.session_id }}";
+
+                const rows = [['URL', 'Phone Count', 'Status', 'Phone Numbers', 'Formats', 'Issues']];
+
+                // Get all table rows and extract data
+                const tableRows = document.querySelectorAll('tbody tr');
+
+                tableRows.forEach(row => {
+                    const cells = row.querySelectorAll('td');
+                    if (cells.length >= 6) {
+                        const url = cells[0].querySelector('div').textContent.trim();
+                        const phoneCount = cells[1].querySelector('span').textContent.trim();
+                        const status = cells[2].querySelector('span').textContent.trim();
+
+                        // Get phone numbers
+                        const phoneElements = cells[3].querySelectorAll('p');
+                        let phoneNumbers = '';
+                        phoneElements.forEach(p => {
+                            const text = p.textContent.replace(/"/g, '""').trim();
+                            if (text && text !== 'No phone numbers found') {
+                                phoneNumbers += (phoneNumbers ? '; ' : '') + text;
+                            }
+                        });
+
+                        // Get formats
+                        const formatElements = cells[4].querySelectorAll('span');
+                        let formats = '';
+                        formatElements.forEach(span => {
+                            const text = span.textContent.replace(/"/g, '""').trim();
+                            if (text && text !== 'No formats detected') {
+                                formats += (formats ? '; ' : '') + text;
+                            }
+                        });
+
+                        // Get issues
+                        const issueElements = cells[5].querySelectorAll('p');
+                        let issues = '';
+                        issueElements.forEach(p => {
+                            const text = p.textContent.replace(/"/g, '""').trim();
+                            if (text && text !== 'No issues') {
+                                issues += (issues ? '; ' : '') + text;
+                            }
+                        });
+
+                        rows.push([
+                            `"${url}"`,
+                            `"${phoneCount}"`,
+                            `"${status}"`,
+                            `"${phoneNumbers}"`,
+                            `"${formats}"`,
+                            `"${issues}"`
+                        ]);
+                    }
+                });
+
+                // Convert to CSV
+                const csvContent = rows.map(row => row.join(',')).join('\n');
+
+                // Create download link
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.setAttribute('href', url);
+                link.setAttribute('download', `phone-audit-results-${sessionId}.csv`);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+        </script>
+
+        {% else %}
+        <div class="text-center py-12">
+            <p class="text-2xl text-gray-400">No results found for this session.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <script>
+        function logout() {
+            document.cookie = "access_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+            window.location.href = "/login";
+        }
+    </script>
+</body>
+
+</html>

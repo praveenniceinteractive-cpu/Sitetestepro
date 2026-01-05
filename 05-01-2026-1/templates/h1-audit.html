@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>H1 Tags Audit</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="/static/style.css" rel="stylesheet" />
+</head>
+<body class="bg-gray-900 text-white min-h-screen">
+    <!-- Navigation Bar -->
+    <nav class="bg-gray-800/80 backdrop-blur border-b border-gray-700">
+        <div class="container mx-auto px-6 py-4">
+            <div class="flex justify-between items-center">
+                <div class="text-xl font-bold text-purple-300">H1 Tags Audit</div>
+                <div class="flex items-center gap-4">
+                    <a href="/" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition">← Dashboard</a>
+                    <a href="/profile" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg transition">Profile</a>
+                    <button onclick="logout()" class="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg transition">Logout</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mx-auto px-6 py-12 max-w-6xl">
+        <h1 class="text-5xl font-bold mb-2 text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-600">
+            H1 Tags Audit
+        </h1>
+        <p class="text-gray-400 text-lg mb-8">Check H1 tags across multiple pages for SEO optimization</p>
+
+        <!-- UPLOAD SECTION -->
+        <div id="upload-section">
+            <form id="upload-form" class="max-w-4xl mx-auto">
+                <div id="drop-zone" class="border-4 border-dashed border-purple-500/50 rounded-3xl p-20 text-center cursor-pointer hover:border-purple-400 transition-all bg-gray-800/50 mb-10">
+                    <div class="text-7xl mb-6">📋</div>
+                    <p class="text-xl text-gray-300">Drop your <strong>urls.txt</strong> here<br>or click to browse</p>
+                    <input type="file" id="file-input" accept=".txt" class="hidden" required />
+                </div>
+
+                <!-- Session Name -->
+                <div class="bg-gray-800/70 rounded-3xl p-8 mb-8">
+                    <h3 class="text-2xl font-bold text-purple-300 mb-6">Session Name</h3>
+                    <input type="text" name="session_name" 
+                           placeholder="My H1 Audit Session" 
+                           value="My H1 Audit Session"
+                           class="w-full px-6 py-4 bg-gray-700/50 border border-gray-600 rounded-xl text-xl focus:outline-none focus:border-purple-500">
+                </div>
+
+                <button type="submit" class="w-full py-6 bg-gradient-to-r from-purple-500 to-pink-600 rounded-2xl font-bold text-3xl hover:from-purple-400 hover:to-pink-500 shadow-2xl">
+                    Start H1 Audit
+                </button>
+            </form>
+        </div>
+
+        <!-- PROGRESS SECTION -->
+        <div id="progress-section" class="hidden">
+            <div class="bg-gray-800/90 backdrop-blur rounded-3xl p-12 shadow-2xl max-w-5xl mx-auto">
+                <h2 class="text-4xl font-bold text-purple-400 mb-10 text-center">Auditing H1 Tags...</h2>
+                <div class="w-full bg-gray-700 rounded-full h-16 mb-8 overflow-hidden">
+                    <div id="progress-bar" class="bg-gradient-to-r from-purple-500 to-pink-600 h-full text-right pr-8 text-2xl font-bold text-white flex items-center justify-end" style="width: 0%">
+                        0%
+                    </div>
+                </div>
+                <p id="status-text" class="text-center text-2xl text-gray-300">Initializing H1 audit...</p>
+                <div class="mt-6 text-center">
+                    <button id="stop-button" class="px-8 py-3 bg-red-600 hover:bg-red-700 rounded-xl font-bold text-lg hidden" onclick="stopSession()">
+                        Stop Session
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- RESULTS SECTION -->
+        <div id="results-section" class="hidden mt-12">
+            <h2 class="text-4xl font-bold text-center mb-12 text-purple-400">H1 Audit Results</h2>
+            <div id="content-area" class="min-h-screen">
+                <!-- Results will be loaded here -->
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/h1-audit.js"></script>
+    <script>
+        function logout() {
+            document.cookie = "access_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+            window.location.href = "/login";
+        }
+    </script>
+</body>
+</html>

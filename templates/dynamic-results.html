@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dynamic Audit Results - {{ session.name }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="/static/style.css" rel="stylesheet" />
+    <style>
+        .browser-tab {
+            padding: 1rem 2rem;
+            border-radius: 0.75rem;
+            font-weight: bold;
+            font-size: 1.125rem;
+            transition: all 0.3s;
+            background: #1f2937;
+            color: #9ca3af;
+            border: 2px solid transparent;
+            cursor: pointer;
+        }
+
+        .browser-tab:hover {
+            background: #374151;
+        }
+
+        .browser-tab.active {
+            background: linear-gradient(to right, #8b5cf6, #ec4899);
+            /* Purple/Pink for Dynamic */
+            color: white;
+            border-color: #ec4899;
+            transform: scale(1.05);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+
+        .url-card {
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .url-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+
+<body class="bg-gray-900 text-white min-h-screen">
+    <nav class="bg-gray-800/80 backdrop-blur border-b border-gray-700">
+        <div class="container mx-auto px-6 py-4">
+            <div class="flex justify-between items-center">
+                <div class="text-xl font-bold text-fuchsia-400">Dynamic Audit Results (Video)</div>
+                <div class="flex items-center gap-4">
+                    <a href="/profile" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition">← Back to
+                        Profile</a>
+                    <a href="/" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition">Dashboard</a>
+                    <button onclick="logout()"
+                        class="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg transition">Logout</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mx-auto px-6 py-12 max-w-7xl">
+        <!-- Session Info -->
+        <div class="bg-gray-800/50 backdrop-blur rounded-2xl p-8 mb-10 border border-fuchsia-500/30">
+            <h1 class="text-4xl font-bold text-fuchsia-300 mb-4">{{ session.name }}</h1>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div>
+                    <p class="text-gray-400">Type</p>
+                    <p class="text-xl font-bold text-fuchsia-400">Dynamic (Video)</p>
+                </div>
+                <div>
+                    <p class="text-gray-400">Status</p>
+                    <span class="px-3 py-1 rounded-full text-sm bg-green-900/50 text-green-300">{{ session.status|title
+                        }}</span>
+                </div>
+                <div>
+                    <p class="text-gray-400">Created</p>
+                    <p class="text-lg">{{ session.created_at.strftime('%Y-%m-%d %H:%M') }}</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Browser Tabs -->
+        <div class="flex justify-center gap-4 mb-10 flex-wrap" id="browser-tabs-container">
+            {% for browser in session.browsers %}
+            <button class="browser-tab" data-browser="{{ browser }}" onclick="loadBrowserView('{{ browser }}')">
+                {{ browser }}
+            </button>
+            {% endfor %}
+        </div>
+
+        <!-- Results Area -->
+        <div id="content-area" class="min-h-screen"></div>
+    </div>
+
+    <script id="session-data-json" type="application/json">
+    {
+        "urls": {{ session.urls | tojson | safe }},
+        "browsers": {{ session.browsers | tojson | safe }},
+        "resolutions": {{ session.resolutions | tojson | safe }}
+    }
+    </script>
+    <script id="results-data-json" type="application/json">
+    {{ results_json | safe }}
+    </script>
+
+    <script>
+        const sessionId = "{{ session.session_id }}";
+        const sessionData = JSON.parse(document.getElementById('session-data-json').textContent);
+        const resultsData = JSON.parse(document.getElementById('results-data-json').textContent);
+
+        function logout() {
+            document.cookie = "access_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+            window.location.href = "/login";
+        }
+
+        function getUniqueFilename(url) {
+            // simplified for matching if needed, but we rely on DB results mostly
+            try {
+                const parsed = new URL(url);
+                let domain = parsed.hostname.replace(/^www\./, '').replace(/[^\w\.-]/g, '-');
+                return `home__${domain}`; // Fallback logic implies simple naming? 
+                // Actually matching DB records is safer.
+            } catch (e) { return 'unknown'; }
+        }
+
+        function loadBrowserView(browser) {
+            document.querySelectorAll('.browser-tab').forEach(t => {
+                t.classList.remove('active');
+                if (t.dataset.browser === browser) t.classList.add('active');
+            });
+
+            const contentArea = document.getElementById('content-area');
+            contentArea.innerHTML = `
+                <h3 class="text-3xl font-bold text-fuchsia-300 mb-10 text-center">${browser} — Select a page to view videos</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                    ${sessionData.urls.map(url => `
+                        <div onclick="showVideos('${url.replace(/'/g, "\\'")}', '${browser}')"
+                             class="url-card bg-gray-800/80 backdrop-blur p-8 rounded-2xl hover:bg-gray-700/90 cursor-pointer transition-all border border-fuchsia-500/30 shadow-xl">
+                            <p class="text-fuchsia-400 font-medium text-lg truncate">${url}</p>
+                            <p class="text-gray-400 text-sm mt-2">Click to watch videos</p>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        function showVideos(url, browser) {
+            const contentArea = document.getElementById('content-area');
+            contentArea.innerHTML = `
+                <div class="mb-12 text-center">
+                     <button onclick="loadBrowserView('${browser}')" class="text-fuchsia-400 hover:underline text-xl mb-6 inline-block bg-gray-800 px-4 py-2 rounded-lg">← Back</button>
+                     <h2 class="text-4xl font-bold text-fuchsia-300 mb-2">${url}</h2>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-7xl mx-auto">
+                    ${sessionData.resolutions.map(res => {
+                const record = resultsData.find(r => r.url === url && r.browser === browser && r.resolution === res);
+                let videoUrl = "";
+
+                if (record) {
+                    if (record.video_path.startsWith('http')) {
+                        videoUrl = record.video_path;
+                    } else {
+                        // Assume local /videos route
+                        // record.video_path might be relative or absolute local path
+                        // We construct standardized path
+                        videoUrl = `/videos/${sessionId}/${browser}/${record.filename}`;
+                    }
+                }
+
+                return `
+                            <div class="bg-gray-800 rounded-2xl overflow-hidden shadow-2xl border border-gray-700">
+                                <div class="bg-black aspect-video flex items-center justify-center relative group">
+                                    ${videoUrl ? `
+                                    <video controls class="w-full h-full object-contain" preload="metadata">
+                                        <source src="${videoUrl}" type="video/mp4">
+                                        Your browser does not support the video tag.
+                                    </video>
+                                    ` : `
+                                    <div class="text-center p-4">
+                                        <p class="text-gray-500">Video not found</p>
+                                        <p class="text-xs text-gray-700 mt-2">Processing or Error</p>
+                                    </div>
+                                    `}
+                                </div>
+                                <div class="p-4 bg-gradient-to-r from-fuchsia-900 to-purple-900 text-center font-bold text-xl">
+                                    ${res}
+                                </div>
+                                ${videoUrl ? `
+                                <div class="p-3 bg-gray-900/50 text-center">
+                                    <a href="${videoUrl}" target="_blank" class="text-fuchsia-300 hover:text-fuchsia-200 text-sm underline">Download Video</a>
+                                </div>` : ''}
+                            </div>
+                        `;
+            }).join('')}
+                </div>
+            `;
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if (sessionData.browsers.length > 0) loadBrowserView(sessionData.browsers[0]);
+        });
+    </script>
+</body>
+
+</html>
