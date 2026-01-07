@@ -13,10 +13,12 @@ class User(Base):
     id = Column(String, primary_key=True, index=True) 
     email = Column(String, unique=True, index=True, nullable=False)
     username = Column(String, unique=True, index=True, nullable=False)
-    # hashed_password is NOT needed as Supabase handles auth
-    # keeping it optional/removed. We'll remove it.
+    hashed_password = Column(String, nullable=False) # Local auth requires password hash
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, index=True)
+    
+    def __repr__(self):
+        return f"<User(id='{self.id}', username='{self.username}', email='{self.email}')>"
 
 class AuditSession(Base):
     __tablename__ = "audit_sessions"
@@ -33,8 +35,11 @@ class AuditSession(Base):
     status = Column(String, default="running")  # running, completed, stopped, error
     total_expected = Column(Integer, default=0)
     completed = Column(Integer, default=0)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, index=True)
     completed_at = Column(DateTime, nullable=True)
+    
+    def __repr__(self):
+        return f"<AuditSession(session_id='{self.session_id}', type='{self.session_type}', status='{self.status}')>"
 
 class H1AuditResult(Base):
     __tablename__ = "h1_audit_results"
@@ -45,7 +50,10 @@ class H1AuditResult(Base):
     h1_count = Column(Integer, default=0)
     h1_texts = Column(Text, nullable=False)  # JSON string of H1 texts
     issues = Column(Text, nullable=False)  # JSON string of issues
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, index=True)
+    
+    def __repr__(self):
+        return f"<H1AuditResult(session_id='{self.session_id}', url='{self.url}', h1_count={self.h1_count})>"
     # Add this to the end of models.py, before the last line
 
 class PhoneAuditResult(Base):
@@ -58,7 +66,10 @@ class PhoneAuditResult(Base):
     phone_count = Column(Integer, default=0)
     formats_detected = Column(Text, nullable=False)  # JSON string of formats detected
     issues = Column(Text, nullable=False)  # JSON string of issues
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, index=True)
+    
+    def __repr__(self):
+        return f"<PhoneAuditResult(session_id='{self.session_id}', url='{self.url}', phone_count={self.phone_count})>"
 
 class PasswordResetToken(Base):
     __tablename__ = "password_reset_tokens"
@@ -141,7 +152,10 @@ class StaticAuditResult(Base):
     resolution = Column(String, nullable=False)
     screenshot_path = Column(String, nullable=False)
     filename = Column(String, nullable=False)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, index=True)
+    
+    def __repr__(self):
+        return f"<StaticAuditResult(session_id='{self.session_id}', url='{self.url}', browser='{self.browser}')>"
 class DynamicAuditResult(Base):
     __tablename__ = "dynamic_audit_results"
     
@@ -152,4 +166,7 @@ class DynamicAuditResult(Base):
     resolution = Column(String, nullable=False)
     video_path = Column(String, nullable=False)
     filename = Column(String, nullable=False)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, index=True)
+    
+    def __repr__(self):
+        return f"<DynamicAuditResult(session_id='{self.session_id}', url='{self.url}', browser='{self.browser}')>"

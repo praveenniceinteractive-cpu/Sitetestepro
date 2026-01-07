@@ -126,12 +126,14 @@
   <div id="progress-section" class="hidden h-full flex items-center justify-center">
     <div class="glass-panel rounded-2xl p-12 shadow-2xl max-w-2xl mx-auto w-full text-center">
       <h2 class="text-3xl font-bold text-cyan-400 mb-8">Capturing Screenshots...</h2>
-      <div class="w-full bg-gray-800 rounded-full h-8 mb-6 overflow-hidden border border-gray-700">
+      <div class="w-full bg-gray-800 rounded-full h-8 mb-6 overflow-hidden border border-gray-700 relative">
         <div id="progress-bar" class="bg-gradient-to-r from-cyan-500 to-blue-600 h-full transition-all duration-300"
           style="width: 0%">
         </div>
+        <div class="absolute inset-0 flex items-center justify-center">
+          <span id="progress-text" class="text-sm font-bold text-white drop-shadow-lg">0%</span>
+        </div>
       </div>
-      <p id="progress-text" class="text-2xl font-bold text-white mb-2">0%</p>
       <p id="status-text" class="text-gray-400">Initializing browsers...</p>
       <div class="mt-8">
         <button id="stop-button"

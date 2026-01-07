@@ -4,6 +4,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Cache busting meta tags to force reload -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>Static Audit Results - {{ session.name }}</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="/static/style.css" rel="stylesheet" />
@@ -108,8 +112,16 @@
     </div>
 
     <script>
+        // Template version check - if you see an old timestamp, hard refresh!
+        const TEMPLATE_VERSION = "{{ cache_buster }}";
+        console.log("=".repeat(60));
+        console.log("STATIC RESULTS TEMPLATE LOADED");
+        console.log("Template Version:", TEMPLATE_VERSION);
+        console.log("Current Time:", new Date().toLocaleString());
+        console.log("=".repeat(60));
+
         // Global variables
-        const sessionId = "{{ session_id }}";
+        const sessionId = "{{ session.session_id }}";
         const sessionType = "static";
         const sessionData = {
             urls: JSON.parse('{{ session.urls|tojson|safe }}'),
@@ -196,68 +208,100 @@
         }
 
         // Show screenshots for a URL
-        function showScreenshots(url, browser) {
+        async function showScreenshots(url, browser) {
             console.log("Showing screenshots for:", url, browser);
 
-            const unique = getUniqueFilename(url);
             const contentArea = document.getElementById('content-area');
-
             if (!contentArea) {
                 console.error("Content area not found!");
                 return;
             }
 
-            contentArea.innerHTML = `
-                <div class="mb-12 text-center">
-                    <button onclick="loadBrowserView('${browser}')" 
-                            class="text-cyan-400 hover:underline text-xl mb-6 inline-block hover:text-cyan-300 transition px-4 py-2 bg-gray-800 rounded-lg">
-                        ← Back to URL List
-                    </button>
-                    <h2 class="text-4xl font-bold text-cyan-300 mb-2">${url}</h2>
-                    <p class="text-gray-400 text-xl">${browser} • ${sessionData.resolutions.length} Resolution${sessionData.resolutions.length > 1 ? 's' : ''}</p>
-                </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-7xl mx-auto">
-                    ${sessionData.resolutions.map(res => {
-                // Find match in resultsData
-                const record = resultsData.find(r => r.url === url && r.browser === browser && r.resolution === res);
-                const unique = getUniqueFilename(url);
-
-                let imageUrl;
-                if (record && record.screenshot_path && record.screenshot_path.startsWith('http')) {
-                    imageUrl = record.screenshot_path;
-                } else if (record) {
-                    imageUrl = `/screenshots/${sessionId}/${browser}/${record.filename}`;
-                } else {
-                    imageUrl = `/screenshots/${sessionId}/${browser}/${unique}__${res}.png`;
+            // Fetch fresh data from API
+            try {
+                const response = await fetch(`/session-config/static/${sessionId}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 }
 
-                return `
-                            <div class="bg-gray-800 rounded-2xl overflow-hidden shadow-2xl border border-gray-700 flex flex-col">
-                                <div class="flex-1 bg-black flex items-center justify-center overflow-hidden min-h-[400px] p-4">
-                                    <img src="${imageUrl}"
-                                         alt="${url} - ${browser} - ${res}"
-                                         class="max-w-full max-h-full object-contain rounded-lg"
-                                         onerror="this.onerror=null;this.src='https://via.placeholder.com/1200x800/111111/666666?text=Screenshot+Not+Found';this.alt='Image not available';"
-                                         loading="lazy"/>
-                                </div>
-                                <div class="p-4 bg-gradient-to-r from-cyan-900 to-blue-900 text-center font-bold text-xl">
-                                    ${res.replace('x', ' × ')}
-                                </div>
-                                <div class="p-3 bg-gray-900/50 text-center">
-                                    <a href="${imageUrl}" 
-                                       target="_blank" 
-                                       class="text-cyan-300 hover:text-cyan-200 text-sm underline">
-                                       View Full Size
-                                    </a>
-                                </div>
-                            </div>
-                        `;
-            }).join('')}
-                </div>
-            `;
+                const config = await response.json();
+                console.log('Session config loaded:', config);
 
-            console.log("Screenshots view loaded for:", url);
+                // Validate response
+                if (!config || !config.results || !Array.isArray(config.results)) {
+                    throw new Error('Invalid response structure from API');
+                }
+
+                // Filter results for this URL and browser
+                const screenshots = config.results.filter(r => r.url === url && r.browser === browser);
+
+                if (screenshots.length === 0) {
+                    contentArea.innerHTML = `
+                        <div class="text-center py-12">
+                            <p class="text-yellow-400 text-2xl">No screenshots found for this URL and browser combination.</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                contentArea.innerHTML = `
+                    <div class="mb-12 text-center">
+                        <button onclick="loadBrowserView('${browser}')" 
+                                class="text-cyan-400 hover:underline text-xl mb-6 inline-block hover:text-cyan-300 transition px-4 py-2 bg-gray-800 rounded-lg">
+                            ← Back to URL List
+                        </button>
+                        <h2 class="text-4xl font-bold text-cyan-300 mb-2">${url}</h2>
+                        <p class="text-gray-400 text-xl">${browser} • ${screenshots.length} Screenshot${screenshots.length > 1 ? 's' : ''}</p>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-7xl mx-auto">
+                        ${screenshots.map(screenshot => {
+                    // Use screenshot_path if it's a Supabase URL, otherwise construct local path
+                    let imageUrl;
+                    if (screenshot.screenshot_path && screenshot.screenshot_path.startsWith('http')) {
+                        imageUrl = screenshot.screenshot_path;
+                    } else if (screenshot.filename) {
+                        imageUrl = `/screenshots/${sessionId}/${browser}/${screenshot.filename}`;
+                    } else {
+                        console.error('No valid path for screenshot:', screenshot);
+                        imageUrl = '';
+                    }
+
+                    return `
+                                <div class="bg-gray-800 rounded-2xl overflow-hidden shadow-2xl border border-gray-700 flex flex-col">
+                                    <div class="flex-1 bg-black flex items-center justify-center overflow-hidden min-h-[400px] p-4">
+                                        <img src="${imageUrl}"
+                                             alt="${url} - ${browser} - ${screenshot.resolution}"
+                                             class="max-w-full max-h-full object-contain rounded-lg"
+                                             onerror="this.onerror=null;this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22400%22 height=%22300%22><rect width=%22400%22 height=%22300%22 fill=%22%23111%22/><text x=%2250%%22 y=%2250%%22 fill=%22%23666%22 text-anchor=%22middle%22 dy=%22.3em%22>Screenshot Not Found</text></svg>';this.alt='Image not available';"
+                                             loading="lazy"/>
+                                    </div>
+                                    <div class="p-4 bg-gradient-to-r from-cyan-900 to-blue-900 text-center font-bold text-xl">
+                                        ${screenshot.resolution.replace('x', ' × ')}
+                                    </div>
+                                    <div class="p-3 bg-gray-900/50 text-center">
+                                        <a href="${imageUrl}" 
+                                           target="_blank" 
+                                           class="text-cyan-300 hover:text-cyan-200 text-sm underline">
+                                           View Full Size
+                                        </a>
+                                    </div>
+                                </div>
+                            `;
+                }).join('')}
+                    </div>
+                `;
+
+                console.log("Screenshots view loaded for:", url);
+            } catch (err) {
+                console.error('Failed to load screenshots:', err);
+                contentArea.innerHTML = `
+                    <div class="text-center py-12">
+                        <p class="text-red-400 text-2xl mb-4">Error loading screenshots</p>
+                        <p class="text-gray-400">${err.message || 'Please try again.'}</p>
+                    </div>
+                `;
+            }
         }
 
         // Initialize on page load

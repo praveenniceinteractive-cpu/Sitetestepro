@@ -1,21 +1,31 @@
-# requirements.txt
-fastapi
-uvicorn
-playwright
-pillow
-imageio
-numpy
-python-multipart
-jinja2
-sqlalchemy
-databases[aiosqlite]
-python-jose[cryptography]
-passlib[bcrypt]
-httpx
-phonenumbers
-phonenumbers
-argon2-cffi
-supabase
-psycopg2-binary
-asyncpg
-python-dotenv
+# Core Framework
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+python-multipart>=0.0.6
+jinja2>=3.1.3
+
+# Database
+sqlalchemy>=2.0.25
+databases[aiosqlite]>=0.8.0
+
+# Authentication & Security
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+argon2-cffi>=23.1.0
+
+# Browser Automation
+playwright>=1.41.0
+
+# Image/Video Processing
+pillow>=10.2.0
+imageio>=2.33.1
+imageio-ffmpeg>=0.4.9
+numpy>=1.26.3
+
+# Utilities
+httpx>=0.26.0
+phonenumbers>=8.13.27
+python-dotenv>=1.0.0
+pydantic-settings>=2.0.0
+aiofiles>=23.0.0
+supabase>=2.3.0

@@ -14,7 +14,7 @@ from fastapi import FastAPI, File, UploadFile, BackgroundTasks, Form, Request, D
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 from starlette.requests import Request as StarletteRequest # Renamed to avoid conflict with fastapi.Request
 from starlette.datastructures import UploadFile as StarletteUploadFile # Renamed to avoid conflict with fastapi.UploadFile
-from supabase import create_client, Client, ClientOptions
+from starlette.datastructures import UploadFile as StarletteUploadFile # Renamed to avoid conflict with fastapi.UploadFile
 import uuid
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -38,6 +38,11 @@ executor = concurrent.futures.ThreadPoolExecutor(max_workers=4)
 import database
 import models
 import auth
+from config import settings
+from supabase import create_client, Client
+
+# Initialize Supabase Client
+supabase: Client = create_client(settings.supabase_url, settings.supabase_key)
 
 # Create necessary directories
 os.makedirs("screenshots", exist_ok=True)
@@ -48,15 +53,22 @@ os.makedirs("templates", exist_ok=True)
 os.makedirs("diffs", exist_ok=True)
 
 app = FastAPI()
+# Mount static files
 app.mount("/static", StaticFiles(directory="static"), name="static")
 app.mount("/screenshots", StaticFiles(directory="screenshots"), name="screenshots")
 app.mount("/videos", StaticFiles(directory="videos"), name="videos")
+
+# Favicon route
+@app.get("/favicon.ico")
+async def favicon():
+    """Serve favicon"""
+    from fastapi.responses import FileResponse
+    return FileResponse("static/favicon.png")
 app.mount("/diffs", StaticFiles(directory="diffs"), name="diffs")
 
 templates = Jinja2Templates(directory="templates")
 
 # ========== CUSTOM JINJA2 FILTERS ==========
-import json
 
 def from_json(value):
     """Custom Jinja2 filter to parse JSON strings"""
@@ -123,8 +135,8 @@ async def require_auth(request: Request, db: Session = Depends(auth.get_db)):
             headers={"Location": "/login"}
         )
     
-    # Enable RLS for this request
-    auth.set_db_session_user(db, user.id)
+    # Enable RLS for this request - REMOVED for SQLite
+    # auth.set_db_session_user(db, user.id)
     
     return user
 
@@ -161,16 +173,7 @@ async def capture_screenshots(urls: List[str], browsers: List[str], resolutions:
     session_folder = f"screenshots/{session_id}"
     os.makedirs(session_folder, exist_ok=True)
     
-    # Init Supabase Client with User context if token exists
-    sb = None
-    if access_token:
-        try:
-             # Pass access token in header for RLS
-             sb = create_client(auth.SUPABASE_URL, auth.SUPABASE_KEY, options=ClientOptions(headers={"Authorization": f"Bearer {access_token}"}))
-        except:
-             # Fallback or log
-             print("Failed to init Supabase client with token")
-             pass
+    display_url_prefix = "/screenshots"
     config = { # This config dictionary was misplaced in the original code, moving it here.
         "urls": urls,
         "browsers": browsers,
@@ -269,22 +272,8 @@ async def capture_screenshots(urls: List[str], browsers: List[str], resolutions:
 
                     # Update progress in database - Best effort
                     try:
-                        # Upload to Supabase if client available
-                        screenshot_path = upload_path.replace("\\", "/") # Default to local
-                        
-                        if sb:
-                            try:
-                                remote_path = f"static/{session_id}/{browser_name}/{os.path.basename(path)}"
-                                with open(path, "rb") as f:
-                                    sb.storage.from_("screenshots").upload(remote_path, f, {"content-type": "image/png", "upsert": "true"})
-                                
-                                screenshot_path = sb.storage.from_("screenshots").get_public_url(remote_path)
-                                
-                                # Clean up local optimized file
-                                os.remove(upload_path)
-                            except Exception as up_err:
-                                print(f"Upload Failed: {up_err}")
-                                # Fallback to local path
+                        # Local Path
+                        screenshot_path = f"/screenshots/{session_id}/{browser_name}/{upload_filename}"
                         
                         # Save result
                         result_record = models.StaticAuditResult(
@@ -392,30 +381,36 @@ async def record_videos_async(urls: List[str], selected_browsers: List[str],
                 try:
                     video_path_local = await record_fullpage_video(page, url, w, h, session_folder, browser_name, unique_name)
                     
-                    # Upload to Supabase
-                    video_url = video_path_local.replace("\\", "/") # Fallback
+                    # Video Path (Local)
+                    video_url = f"/videos/{session_id}/{browser_name}/{os.path.basename(video_path_local)}"
                     
-                    if access_token:
-                        print(f"[DYNAMIC] Access Token present. Attempting upload...")
-                        try:
-                             sb = create_client(auth.SUPABASE_URL, auth.SUPABASE_KEY, options=ClientOptions(headers={"Authorization": f"Bearer {access_token}"}))
-                             
-                             remote_path = f"videos/{session_id}/{browser_name}/{os.path.basename(video_path_local)}"
-                             print(f"[DYNAMIC] Uploading to: {remote_path}")
-                             with open(video_path_local, "rb") as vf:
-                                 # videos/mp4 content type
-                                 sb.storage.from_("screenshots").upload(remote_path, vf, {"content-type": "video/mp4", "upsert": "true"})
-                             
-                             video_url = sb.storage.from_("screenshots").get_public_url(remote_path)
-                             print(f"[DYNAMIC] Upload Success. URL: {video_url}")
-                             
-                             # Clean up local
-                             if os.path.exists(video_path_local):
-                                 os.remove(video_path_local)
-                        except Exception as up_err:
-                            print(f"[DYNAMIC] Upload Error: {up_err}")
-                            import traceback
-                            traceback.print_exc()
+                    # Try Upload to Supabase
+                    try:
+                        filename = os.path.basename(video_path_local)
+                        storage_path = f"{session_id}/{browser_name}/{filename}"
+                        
+                        # Define upload task
+                        def upload_to_supabase():
+                            with open(video_path_local, 'rb') as f:
+                                supabase.storage.from_("videos").upload(
+                                    storage_path,
+                                    f,
+                                    file_options={"content-type": "video/mp4", "upsert": "true"}
+                                )
+                            return supabase.storage.from_("videos").get_public_url(storage_path)
+
+                        # Run upload in thread pool
+                        loop = asyncio.get_running_loop()
+                        public_url = await loop.run_in_executor(executor, upload_to_supabase)
+                        
+                        if public_url:
+                            video_url = public_url
+                            print(f"[Supabase] Uploaded: {video_url}")
+                            # Optional: Remove local file after successful upload to save space
+                            # os.remove(video_path_local) 
+                    except Exception as upload_err:
+                        print(f"[Supabase] Upload Failed: {upload_err}")
+                        # Fallback to local path (video_url is already set)
 
                     print(f"[DYNAMIC] Final Video URL: {video_url}")
                     # Save result to DB
@@ -569,11 +564,12 @@ async def record_fullpage_video(page, url: str, w: int, h: int, session_folder: 
                 functools.partial(imageio.mimsave, video_path, images, fps=3) # Higher FPS for smoother look
             )
             print(f"Video saved: {video_path}")
+            
+            # Clean up temp frames
+            shutil.rmtree(frames_dir, ignore_errors=True)
+            
             return video_path
         return None
-        
-        # Clean up temp frames
-        shutil.rmtree(frames_dir, ignore_errors=True)
         
     except Exception as e:
         print(f"Error recording video for {url}: {e}")
@@ -1000,7 +996,6 @@ async def audit_phone_numbers(urls: List[str], countries: List[str], options: Li
     print(f"PHONE AUDIT SESSION {session_id} COMPLETED")
 
 # ========== HELPER FUNCTIONS ==========
-
 def add_browser_frame(img_path: str, url: str):
     """Add browser frame with URL bar to screenshot."""
     try:
@@ -1331,14 +1326,19 @@ async def static_results_view(session_id: str, request: Request, db: Session = D
             "screenshot_path": r.screenshot_path # Include full path/URL
         })
     
+    import time
+    cache_buster = int(time.time())  # Add timestamp to force cache invalidation
+    
     return templates.TemplateResponse("static-results.html", {
         "request": request,
         "user": user,
         "session": session,
         "results": results,
         "results_data": json.dumps(results_list),
-        "results_json": json.dumps([r.url for r in results]), # Helper if needed
+        "results_json": json.dumps([r.url for r in results]),
+        "cache_buster": cache_buster  # Force browser to reload template
     })
+
 
 @app.get("/dynamic-results/{session_id}")
 async def dynamic_results_view(session_id: str, request: Request, db: Session = Depends(auth.get_db)):
@@ -1424,16 +1424,16 @@ async def register(
         if db.query(models.User).filter(models.User.username == request.username).first():
             raise HTTPException(status_code=400, detail="Username already taken")
 
-        # Register with Supabase (handles email uniqueness)
+        # Register locally
         user = auth.register_user(request.email, request.password, request.username, db)
 
         print(f"User created successfully: {user.id}, {user.username}")
 
         # Auto-login to get token
-        session = auth.login_user(request.email, request.password)
+        login_data = auth.login_user(request.email, request.password, db)
 
         return {
-            "access_token": session.access_token,
+            "access_token": login_data["access_token"],
             "token_type": "bearer",
             "user": {"id": user.id, "username": user.username}
         }
@@ -1462,17 +1462,15 @@ async def login(
                  raise HTTPException(status_code=400, detail="Incorrect username or password")
             email = user.email
 
-        # Authenticate with Supabase
-        session = auth.login_user(email, request.password)
+        # Authenticate locally
+        login_data = auth.login_user(email, request.password, db)
         
-        # Get local profile to return username
-        user = db.query(models.User).filter(models.User.id == session.user.id).first()
-        username = user.username if user else email.split("@")[0]
-
+        user = login_data["user"]
+        
         return {
-            "access_token": session.access_token, 
+            "access_token": login_data["access_token"], 
             "token_type": "bearer", 
-            "user": {"id": session.user.id, "username": username}
+            "user": {"id": user.id, "username": user.username}
         }
     except Exception as e:
         print(f"Login error: {e}")
@@ -1584,33 +1582,22 @@ async def reset_password(request: ResetPasswordRequest, db: Session = Depends(au
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
-    # Update password
+    # Update password locally
+    user = db.query(models.User).filter(models.User.id == reset_token.user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
     user.hashed_password = auth.get_password_hash(request.password)
     
     # Mark token as used
     reset_token.used = True
-    
     db.commit()
     
     return JSONResponse({
-        "message": "Password reset successfully! Redirecting to login..."
+        "message": "Password reset successfully. Please login with your new password."
     })
 
-@app.delete("/api/sessions/{session_id}")
-async def delete_session(session_id: str, request: Request, db: Session = Depends(auth.get_db)):
-    """Delete audit session and associated data"""
-    user = await get_current_user_from_cookie(request, db)
-    if not user:
-         raise HTTPException(status_code=401, detail="Not authenticated")
-         
-    session = db.query(models.AuditSession).filter(
-        models.AuditSession.session_id == session_id,
-        models.AuditSession.user_id == user.id
-    ).first()
-    
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
-        
+# Helper function for session cleanup (moved before route definition)
 def perform_session_cleanup(session_id: str, db: Session):
     """Helper to cleanup session artifacts and DB records (Child records only)"""
     try:
@@ -2046,22 +2033,6 @@ async def phone_progress(session_id: str, db: Session = Depends(auth.get_db)):
         "total": session.total_expected,
         "status": session.status
     }
-
-@app.get("/session-config/{session_type}/{session_id}")
-async def session_config(session_type: str, session_id: str, db: Session = Depends(auth.get_db)):
-    """Get session configuration"""
-    if session_type == "static":
-        path = f"screenshots/{session_id}/config.json"
-    elif session_type == "dynamic":
-        path = f"videos/{session_id}/config.json"
-    else:
-        return {"urls": [], "browsers": [], "resolutions": [], "type": session_type}
-    
-    if not os.path.exists(path):
-        return {"urls": [], "browsers": [], "resolutions": [], "type": session_type}
-    
-    with open(path) as f:
-        return json.load(f)
 
 @app.get("/results/{session_type}/{session_id}")
 async def view_results(session_type: str, session_id: str, request: Request, db: Session = Depends(auth.get_db)):
@@ -2613,13 +2584,41 @@ async def platform_dashboard(request: Request, user: models.User = Depends(requi
     # Mock active jobs for now
     active_jobs = db.query(models.AuditSession).filter(models.AuditSession.user_id == user.id, models.AuditSession.status == "running").count()
 
+    # Calculate Total Issues Detected
+    user_sessions = db.query(models.AuditSession.session_id).filter(models.AuditSession.user_id == user.id).all()
+    user_session_ids = [s[0] for s in user_sessions]
+    
+    total_issues = 0
+    if user_session_ids:
+        # H1 Issues
+        h1_res = db.query(models.H1AuditResult.issues).filter(models.H1AuditResult.session_id.in_(user_session_ids)).all()
+        for r in h1_res:
+            try:
+                issues = json.loads(r[0])
+                total_issues += len(issues)
+            except: pass
+            
+        # Phone Issues
+        phone_res = db.query(models.PhoneAuditResult.issues).filter(models.PhoneAuditResult.session_id.in_(user_session_ids)).all()
+        for r in phone_res:
+             try:
+                issues = json.loads(r[0])
+                total_issues += len(issues)
+             except: pass
+
+        # Accessibility Violations
+        access_res = db.query(models.AccessibilityAuditResult.violations_count).filter(models.AccessibilityAuditResult.session_id.in_(user_session_ids)).all()
+        for r in access_res:
+            total_issues += (r[0] or 0)
+
     return templates.TemplateResponse("dashboard.html", {
         "request": request, 
         "user": user, 
         "total_sessions": total_sessions,
         "success_rate": success_rate,
         "recent_sessions": recent_sessions,
-        "active_jobs": active_jobs
+        "active_jobs": active_jobs,
+        "total_issues": total_issues
     })
 
 @app.get("/platform/device-lab", response_class=HTMLResponse)
@@ -2722,6 +2721,137 @@ async def get_any_results(session_id: str, request: Request, db: Session = Depen
              "score": r.score
          } for r in results]
     return []
+
+@app.get("/session-config/static/{session_id}")
+async def get_static_session_config(session_id: str, request: Request, db: Session = Depends(auth.get_db)):
+    """Get static audit session configuration and results with actual file URLs"""
+    print(f"[ENTRY] get_static_session_config called for session: {session_id}", flush=True)
+    
+    user = await get_current_user_from_cookie(request, db)
+    print(f"[AUTH] User authenticated: {user is not None}", flush=True)
+    if not user:
+        raise HTTPException(status_code=401)
+    
+    session = db.query(models.AuditSession).filter_by(session_id=session_id, user_id=user.id).first()
+    print(f"[DB] Session found: {session is not None}", flush=True)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    # Get all results with actual file paths
+    results = db.query(models.StaticAuditResult).filter_by(session_id=session_id).all()
+    print(f"[DB] Found {len(results)} StaticAuditResult records", flush=True)
+    
+    # Parse session data
+    urls = json.loads(session.urls) if isinstance(session.urls, str) else session.urls
+    browsers = json.loads(session.browsers) if isinstance(session.browsers, str) else session.browsers
+    resolutions = json.loads(session.resolutions) if isinstance(session.resolutions, str) else session.resolutions
+    print(f"[PARSE] URLs: {len(urls)}, Browsers: {len(browsers)}, Resolutions: {len(resolutions)}", flush=True)
+    
+    # Build response with actual file URLs from database
+    results_map = {}
+    for result in results:
+        key = f"{result.url}_{result.browser}_{result.resolution}"
+        results_map[key] = {
+            "url": result.url,
+            "browser": result.browser,
+            "resolution": result.resolution,
+            "screenshot_path": result.screenshot_path,
+            "filename": result.filename
+        }
+    
+    print(f"[BUILD] Results map has {len(results_map)} entries", flush=True)
+    
+    results_list = list(results_map.values()) if results_map else []
+    print(f"[BUILD] Results list length: {len(results_list)}", flush=True)
+    
+    response_data = {
+        "urls": urls,
+        "browsers": browsers,
+        "resolutions": resolutions,
+        "results": results_list,
+        "type": session.session_type
+    }
+    
+    print(f"[RESPONSE] Keys: {list(response_data.keys())}", flush=True)
+    print(f"[RESPONSE] Has results field: {'results' in response_data}", flush=True)
+    print(f"[RESPONSE] Results count: {len(response_data.get('results', []))}", flush=True)
+    
+    # Debug: Print first result if available
+    if results_list:
+        print(f"[DEBUG] First result filename: {results_list[0].get('filename')}", flush=True)
+        print(f"[DEBUG] First result screenshot_path: {results_list[0].get('screenshot_path')}", flush=True)
+    
+    print(f"[EXIT] Returning response", flush=True)
+    
+    return response_data
+
+
+@app.get("/session-config/dynamic/{session_id}")
+async def get_dynamic_session_config(session_id: str, request: Request, db: Session = Depends(auth.get_db)):
+    """Get dynamic audit session configuration and results with actual file URLs"""
+    print(f"[ENTRY] get_dynamic_session_config called for session: {session_id}", flush=True)
+    
+    user = await get_current_user_from_cookie(request, db)
+    print(f"[AUTH] User authenticated: {user is not None}", flush=True)
+    if not user:
+        print("[AUTH] No user - returning 401", flush=True)
+        raise HTTPException(status_code=401)
+    
+    session = db.query(models.AuditSession).filter_by(session_id=session_id, user_id=user.id).first()
+    print(f"[DB] Session found: {session is not None}", flush=True)
+    if not session:
+        print("[DB] No session - returning 404", flush=True)
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    # Get all results with actual file paths
+    results = db.query(models.DynamicAuditResult).filter_by(session_id=session_id).all()
+    print(f"[DB] Found {len(results)} DynamicAuditResult records", flush=True)
+    
+    # Parse session data
+    urls = json.loads(session.urls) if isinstance(session.urls, str) else session.urls
+    browsers = json.loads(session.browsers) if isinstance(session.browsers, str) else session.browsers
+    resolutions = json.loads(session.resolutions) if isinstance(session.resolutions, str) else session.resolutions
+    print(f"[PARSE] URLs: {len(urls)}, Browsers: {len(browsers)}, Resolutions: {len(resolutions)}", flush=True)
+    
+    # Build response with actual file URLs from database
+    results_map = {}
+    for result in results:
+        key = f"{result.url}_{result.browser}_{result.resolution}"
+        results_map[key] = {
+            "url": result.url,
+            "browser": result.browser,
+            "resolution": result.resolution,
+            "video_path": result.video_path,
+            "filename": result.filename
+        }
+    
+    print(f"[BUILD] Results map has {len(results_map)} entries", flush=True)
+    
+    results_list = list(results_map.values()) if results_map else []
+    print(f"[BUILD] Results list length: {len(results_list)}", flush=True)
+    
+    response_data = {
+        "urls": urls,
+        "browsers": browsers,
+        "resolutions": resolutions,
+        "results": results_list,
+        "type": session.session_type
+    }
+    
+    print(f"[RESPONSE] Keys: {list(response_data.keys())}", flush=True)
+    print(f"[RESPONSE] Has results field: {'results' in response_data}", flush=True)
+    print(f"[RESPONSE] Results count: {len(response_data.get('results', []))}", flush=True)
+    print(f"[EXIT] Returning response", flush=True)
+    
+    return response_data
+
+
+@app.get("/test-code-version")
+async def test_code_version():
+    """Test endpoint to verify code changes are loaded"""
+    return {"version": "2024-01-06-v2", "message": "Code changes loaded successfully!", "results_field_added": True}
+
+
 
 @app.get("/platform/accessibility", response_class=HTMLResponse)
 async def accessibility_test_view(request: Request, user: models.User = Depends(require_auth)):
@@ -2952,4 +3082,4 @@ async def get_unified_results(session_id: str, request: Request, db: Session = D
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8004)

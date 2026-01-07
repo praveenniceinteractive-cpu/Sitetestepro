@@ -23,6 +23,29 @@
 
         <div class="h-8 w-px bg-white/10 mx-2"></div>
 
+        <!-- Custom Resolution Inputs -->
+        <div class="flex items-center gap-2">
+            <div class="flex items-center bg-slate-950 border border-white/10 rounded-lg overflow-hidden h-8">
+                <input type="number" id="customW" placeholder="W"
+                    class="w-16 bg-transparent text-white text-xs text-center border-r border-white/10 focus:outline-none h-full"
+                    min="300">
+                <input type="number" id="customH" placeholder="H"
+                    class="w-16 bg-transparent text-white text-xs text-center focus:outline-none h-full" min="300">
+            </div>
+            <button onclick="addCustomDevice()"
+                class="h-8 w-8 bg-blue-600 hover:bg-blue-500 rounded-lg flex items-center justify-center text-white transition shadow-lg shadow-blue-500/20"
+                title="Add Custom Device">
+                <i data-lucide="plus" class="w-4 h-4"></i>
+            </button>
+            <button onclick="addStaticAuditDevices()"
+                class="h-8 px-3 bg-slate-800 hover:bg-slate-700 border border-white/10 rounded-lg flex items-center justify-center text-slate-300 text-xs font-medium transition ml-2"
+                title="Add All Static Audit Sizes">
+                <i data-lucide="layers" class="w-3 h-3 mr-1"></i> Add All Sizes
+            </button>
+        </div>
+
+        <div class="h-8 w-px bg-white/10 mx-2"></div>
+
         <div class="flex items-center bg-slate-800 rounded-lg p-1 border border-white/5">
             <button onclick="setGrid('1')"
                 class="p-1.5 hover:bg-slate-700 rounded text-slate-400 hover:text-white transition" title="Single View">
@@ -38,12 +61,21 @@
             </button>
         </div>
 
-        <button onclick="rotateDevices()"
-            class="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-blue-400 transition ml-auto border border-transparent hover:border-white/5 flex items-center gap-2 text-xs font-medium"
-            title="Rotate All">
-            <i data-lucide="rotate-cw" class="w-4 h-4"></i>
-            Rotate
-        </button>
+        <div class="ml-auto flex items-center gap-2">
+            <button onclick="toggleSync()" id="syncBtn"
+                class="p-2 bg-emerald-500/10 text-emerald-400 rounded-lg border border-emerald-500/20 hover:bg-emerald-500/20 transition flex items-center gap-2 text-xs font-medium"
+                title="Sync Scrolling">
+                <i data-lucide="link" class="w-4 h-4"></i>
+                <span class="hidden sm:inline">Sync On</span>
+            </button>
+
+            <button onclick="rotateDevices()"
+                class="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-blue-400 transition border border-transparent hover:border-white/5 flex items-center gap-2 text-xs font-medium"
+                title="Rotate All">
+                <i data-lucide="rotate-cw" class="w-4 h-4"></i>
+                <span class="hidden sm:inline">Rotate</span>
+            </button>
+        </div>
     </div>
 
     <!-- Device Canvas -->
@@ -53,7 +85,7 @@
             style="background-image: linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px); background-size: 40px 40px;">
         </div>
 
-        <div id="deviceGrid" class="flex flex-wrap gap-12 items-start justify-center relative z-10 pb-20">
+        <div id="deviceGrid" class="flex flex-nowrap gap-12 items-start justify-start relative z-10 pb-20">
 
             <!-- iPhone 14 Pro -->
             <div class="device-frame flex flex-col items-center gap-4 group">
@@ -65,8 +97,8 @@
                     <div class="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-7 bg-black rounded-b-2xl z-20"></div>
                     <!-- Dynamic Island -->
                     <div class="w-full h-[760px] bg-white rounded-[2rem] overflow-hidden relative">
-                        <iframe src="about:blank" class="w-full h-full border-0 test-frame bg-white"
-                            id="frame-mobile"></iframe>
+                        <iframe src="about:blank" class="w-full h-full border-0 test-frame bg-white" id="frame-mobile"
+                            sandbox="allow-same-origin allow-scripts allow-forms"></iframe>
                     </div>
                 </div>
             </div>
@@ -79,8 +111,8 @@
                 <div class="relative bg-slate-900 rounded-[2rem] p-3 border-4 border-slate-800 shadow-2xl ring-1 ring-white/10 transition-transform duration-500 hover:scale-[1.01]"
                     style="width: 580px;">
                     <div class="w-full h-[780px] bg-white rounded-xl overflow-hidden">
-                        <iframe src="about:blank" class="w-full h-full border-0 test-frame bg-white"
-                            id="frame-tablet"></iframe>
+                        <iframe src="about:blank" class="w-full h-full border-0 test-frame bg-white" id="frame-tablet"
+                            sandbox="allow-same-origin allow-scripts allow-forms"></iframe>
                     </div>
                 </div>
             </div>
@@ -93,8 +125,8 @@
                 <div class="relative bg-slate-800 rounded-t-xl p-2 pb-0 shadow-2xl ring-1 ring-white/10"
                     style="width: 700px;">
                     <div class="w-full h-[450px] bg-white rounded-t lg overflow-hidden border border-slate-700">
-                        <iframe src="about:blank" class="w-full h-full border-0 test-frame bg-white"
-                            id="frame-desktop"></iframe>
+                        <iframe src="about:blank" class="w-full h-full border-0 test-frame bg-white" id="frame-desktop"
+                            sandbox="allow-same-origin allow-scripts allow-forms"></iframe>
                     </div>
                     <div class="w-full h-4 bg-slate-700 rounded-b mt-0.5 flex justify-center border-t border-slate-600">
                         <div class="w-16 h-1 bg-slate-600 rounded-b-lg"></div>
@@ -109,44 +141,187 @@
 <script>
     lucide.createIcons();
     let currentRotation = 0;
+    let syncEnabled = true;
+    let isScrolling = false;
+    let currentUrl = "";
 
     function setGrid(layout) {
+        // Explicitly get default devices
         const mobile = document.querySelector('.device-frame:nth-child(1)');
         const tablet = document.querySelector('.device-frame:nth-child(2)');
         const laptop = document.querySelector('.device-frame:nth-child(3)');
-        const container = document.getElementById('deviceGrid');
 
-        // Reset display
-        mobile.style.display = 'flex';
-        tablet.style.display = 'flex';
-        laptop.style.display = 'flex';
+        // Reset all to visible first
+        if (mobile) mobile.style.display = 'flex';
+        if (tablet) tablet.style.display = 'flex';
+        if (laptop) laptop.style.display = 'flex';
 
         if (layout === '1') {
             // Single View - Mobile Only
-            tablet.style.display = 'none';
-            laptop.style.display = 'none';
-            container.className = 'flex flex-wrap gap-12 items-start justify-center relative z-10 pb-20';
+            if (tablet) tablet.style.display = 'none';
+            if (laptop) laptop.style.display = 'none';
         } else if (layout === '2') {
             // Dual View - Mobile + Tablet
-            laptop.style.display = 'none';
-            container.className = 'flex flex-wrap gap-12 items-start justify-center relative z-10 pb-20';
-        } else {
-            // Grid View - All (Default)
-            container.className = 'flex flex-wrap gap-12 items-start justify-center relative z-10 pb-20';
+            if (laptop) laptop.style.display = 'none';
         }
+
+        // Update active state for buttons
+        const btns = document.querySelectorAll('button[onclick^="setGrid"]');
+        btns.forEach(btn => {
+            if (btn.getAttribute('onclick') === `setGrid('${layout}')`) {
+                btn.classList.add('bg-slate-700', 'text-white');
+                btn.classList.remove('text-slate-400', 'hover:bg-slate-700'); // Remove hover class to stick
+            } else {
+                btn.classList.remove('bg-slate-700', 'text-white');
+                btn.classList.add('text-slate-400', 'hover:bg-slate-700');
+            }
+        });
+    }
+
+    function addCustomDevice() {
+        const w = document.getElementById('customW').value;
+        const h = document.getElementById('customH').value;
+
+        if (!w || !h) {
+            alert('Please enter both width and height');
+            return;
+        }
+        addDeviceFrame(w, h);
+    }
+
+    function addStaticAuditDevices() {
+        // Resolutions from static-audit.html
+        const resolutions = [
+            { w: 1920, h: 1080, name: "Desktop" },
+            { w: 1440, h: 900, name: "Laptop" },
+            { w: 1366, h: 768, name: "Laptop" },
+            { w: 1280, h: 1024, name: "Laptop" },
+            { w: 1024, h: 768, name: "Old Desk" },
+            { w: 900, h: 1440, name: "Tablet P" },
+            { w: 768, h: 1024, name: "Tablet L" },
+            { w: 480, h: 800, name: "Mobile" }
+        ];
+
+        resolutions.forEach(res => {
+            addDeviceFrame(res.w, res.h, res.name);
+        });
+    }
+
+    function addDeviceFrame(w, h, name = "Custom") {
+        const grid = document.getElementById('deviceGrid');
+
+        // Create new device element
+        const div = document.createElement('div');
+        div.className = 'device-frame flex flex-col items-center gap-4 group';
+        div.innerHTML = `
+            <div class="text-xs text-slate-500 font-medium uppercase tracking-widest flex items-center gap-2">
+                <i data-lucide="monitor" class="w-3 h-3"></i> ${name} (${w}x${h})
+                <button onclick="this.closest('.device-frame').remove()" class="ml-2 text-red-500 hover:text-red-400">
+                    <i data-lucide="x" class="w-3 h-3"></i>
+                </button>
+            </div>
+            <div class="relative bg-slate-900 rounded-lg p-3 border-4 border-slate-800 shadow-2xl ring-1 ring-white/10 transition-transform duration-500 hover:scale-[1.01]"
+                style="width: ${parseInt(w) + 24}px;">
+                <div class="w-full bg-white rounded-md overflow-hidden" style="height: ${h}px;">
+                    <iframe src="${currentUrl ? getProxyUrl(currentUrl) : 'about:blank'}" 
+                        class="w-full h-full border-0 test-frame bg-white" sandbox="allow-same-origin allow-scripts allow-forms"></iframe>
+                </div>
+            </div>
+        `;
+
+        grid.appendChild(div);
+        lucide.createIcons();
+
+        // Re-attach listeners
+        if (currentUrl) {
+            setupSyncForFrame(div.querySelector('iframe'));
+        }
+    }
+
+    function getProxyUrl(url) {
+        return `/api/proxy?url=${encodeURIComponent(url)}`;
     }
 
     function loadUrl() {
         let url = document.getElementById('urlInput').value.trim();
         if (!url) return;
 
-        // Use proxy to avoid X-Frame-Options
-        const proxyUrl = `/api/proxy?url=${encodeURIComponent(url)}`;
+        currentUrl = url;
+        const proxyUrl = getProxyUrl(url);
 
         // Update all iframes
-        document.querySelectorAll('.test-frame').forEach(frame => {
+        const frames = document.querySelectorAll('.test-frame');
+        frames.forEach(frame => {
             frame.src = proxyUrl;
+            // Add listener when frame loads
+            frame.onload = () => setupSyncForFrame(frame);
         });
+    }
+
+    function setupSyncForFrame(iframe) {
+        if (!syncEnabled) return;
+
+        try {
+            // We can access contentWindow because we are on same origin (proxy)
+            // But sometimes even same origin logic is tricky with iframes dynamically
+            // Note: If X-Frame-Options is STRIPPED by proxy, this works.
+
+            const doc = iframe.contentDocument || iframe.contentWindow.document;
+            const win = iframe.contentWindow;
+
+            win.addEventListener('scroll', function () {
+                if (!syncEnabled || isScrolling) return;
+
+                isScrolling = true;
+
+                // Calculate percentage
+                const scrollTop = win.scrollY;
+                const maxScroll = doc.documentElement.scrollHeight - win.innerHeight;
+                const scrollPercentage = maxScroll > 0 ? scrollTop / maxScroll : 0;
+
+                // Sync others
+                document.querySelectorAll('.test-frame').forEach(otherFrame => {
+                    if (otherFrame !== iframe) {
+                        try {
+                            const otherWin = otherFrame.contentWindow;
+                            const otherDoc = otherFrame.contentDocument || otherWin.document;
+                            const otherMax = otherDoc.documentElement.scrollHeight - otherWin.innerHeight;
+
+                            otherWin.scrollTo(0, scrollPercentage * otherMax);
+                        } catch (e) { /* Ignore cross-origin errors if any */ }
+                    }
+                });
+
+                // Debounce simple
+                setTimeout(() => { isScrolling = false; }, 50);
+            }, { passive: true });
+
+        } catch (e) {
+            console.log("Cannot attach sync listener — likely cross-origin blockage or frame not ready.", e);
+        }
+    }
+
+    function toggleSync() {
+        syncEnabled = !syncEnabled;
+        const btn = document.getElementById('syncBtn');
+        const icon = btn.querySelector('i');
+        const text = btn.querySelector('span');
+
+        if (syncEnabled) {
+            btn.classList.add('text-emerald-400', 'bg-emerald-500/10');
+            btn.classList.remove('text-slate-400', 'bg-slate-800');
+            icon.setAttribute('data-lucide', 'link');
+            text.textContent = 'Sync On';
+
+            // Re-attach
+            document.querySelectorAll('.test-frame').forEach(frame => setupSyncForFrame(frame));
+        } else {
+            btn.classList.remove('text-emerald-400', 'bg-emerald-500/10');
+            btn.classList.add('text-slate-400', 'bg-slate-800');
+            icon.setAttribute('data-lucide', 'link-2-off');
+            text.textContent = 'Sync Off';
+        }
+        lucide.createIcons();
     }
 
     function rotateDevices() {
@@ -154,19 +329,22 @@
         const frames = document.querySelectorAll('.device-frame');
 
         frames.forEach(frame => {
-            const device = frame.querySelector('div:nth-child(2)');
-            if (!device || device.style.width === '700px') return; // Skip laptop
+            // Logic for custom frames vs standard ones
+            // Standard ones have div:nth-child(2) as the container
+            const device = frame.querySelector('div.relative');
+            if (!device) return;
+
+            // Skip Macbook (width 700) or check if it's the laptop
+            if (device.style.width === '700px') return;
 
             device.style.transition = 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)';
 
             if (currentRotation === 90) {
                 const height = device.offsetHeight;
-                const width = device.offsetWidth; // Use offsetWidth to get actual rendered width
+                const width = device.offsetWidth;
                 const diff = (height - width) / 2;
 
                 device.style.transform = 'rotate(90deg)';
-                // Add vertical margin to compensate for rotation swing
-                // Add horizontal margin to reserve space in the flow
                 device.style.margin = `${diff}px ${diff}px`;
             } else {
                 device.style.transform = 'rotate(0deg)';

@@ -160,6 +160,10 @@
                 let videoUrl = "";
 
                 if (record) {
+                    console.log('[DEBUG] Record found:', record);
+                    console.log('[DEBUG] video_path:', record.video_path);
+                    console.log('[DEBUG] Starts with http?', record.video_path.startsWith('http'));
+
                     if (record.video_path.startsWith('http')) {
                         videoUrl = record.video_path;
                     } else {
@@ -168,6 +172,8 @@
                         // We construct standardized path
                         videoUrl = `/videos/${sessionId}/${browser}/${record.filename}`;
                     }
+                } else {
+                    console.log('[DEBUG] No record found for:', url, browser, res);
                 }
 
                 return `

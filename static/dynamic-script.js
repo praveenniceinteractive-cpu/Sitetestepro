@@ -153,7 +153,7 @@ form.onsubmit = async (e) => {
     sessionId = data.session;
     totalExpected = data.total_expected;
 
-    document.getElementById('status-text').textContent = "Launching browsers and recording videos...";
+    document.getElementById('status-text').textContent = "Initializing...";
 
     pollInterval = setInterval(async () => {
       try {
@@ -165,7 +165,10 @@ form.onsubmit = async (e) => {
         const status = prog.status || "running";
 
         document.getElementById('progress-bar').style.width = `${percent}%`;
-        document.getElementById('progress-bar').textContent = `${percent}%`;
+        const progressText = document.getElementById('progress-text');
+        if (progressText) {
+          progressText.textContent = `${percent}%`;
+        }
         document.getElementById('status-text').textContent = `Recorded ${completed} of ${total} videos...`;
 
         // Handle different statuses
@@ -357,46 +360,82 @@ function showVideos(url, browser) {
   const checkedRes = document.querySelectorAll('input[name="resolution"]:checked');
   const resolutions = Array.from(checkedRes).map(cb => cb.value);
 
-  document.getElementById('content-area').innerHTML = `
-    <div class="mb-12 text-center">
-      <button onclick="loadBrowserView('${browser}')" 
-              class="text-blue-400 hover:underline text-xl mb-6 inline-block hover:text-blue-300 transition">
-        ← Back to URL List
-      </button>
-      <h2 class="text-5xl font-bold text-blue-300 mb-4">${url}</h2>
-      <p class="text-gray-400 text-2xl">Responsive Videos • ${resolutions.length} Resolution${resolutions.length > 1 ? 's' : ''}</p>
-    </div>
+  // Fetch actual video URLs from database
+  fetch(`/session-config/dynamic/${sessionId}`)
+    .then(res => {
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+      }
+      return res.json();
+    })
+    .then(config => {
+      console.log('Session config:', config); // Debug log
 
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 max-w-7xl mx-auto px-6">
-      ${selectedBrowsers.map(b => `
-        <div class="bg-gray-800 rounded-3xl overflow-hidden shadow-2xl border-4 border-gray-700">
-          <div class="bg-gradient-to-r from-blue-800 to-purple-900 p-6 text-center">
-            <h3 class="text-4xl font-bold text-white tracking-wider">${b}</h3>
-          </div>
-          <div class="p-10 bg-gray-900 space-y-12">
-            ${resolutions.map(res => {
-    const unique = getUniqueFilename(url);
-    return `
-                <div class="group">
-                  <div class="bg-black rounded-2xl overflow-hidden border-4 border-gray-700 shadow-2xl transition-all duration-300 group-hover:border-blue-500">
-                    <video 
-                      controls 
-                      preload="metadata" 
-                      class="w-full h-auto block mx-auto"
-                      style="max-width: 100%; height: auto;">
-                      <source src="/videos/${sessionId}/${b}/${unique}__${res}.mp4" type="video/mp4">
-                      Your browser does not support the video tag.
-                    </video>
-                  </div>
-                  <div class="mt-6 text-center">
-                    <span class="text-3xl font-bold text-blue-300">${res.replace('x', ' × ')}</span>
-                  </div>
-                </div>
-              `;
-  }).join('')}
-          </div>
+      // Validate response structure
+      if (!config || !config.results || !Array.isArray(config.results)) {
+        throw new Error('Invalid response structure from API');
+      }
+
+      // Filter results for this URL and browser
+      const videoResults = config.results.filter(r => r.url === url && r.browser === browser);
+
+      if (videoResults.length === 0) {
+        document.getElementById('content-area').innerHTML = `
+          <p class="text-yellow-400 text-center text-2xl">No videos found for this URL and browser combination.</p>
+        `;
+        return;
+      }
+
+      document.getElementById('content-area').innerHTML = `
+        <div class="mb-12 text-center">
+          <button onclick="loadBrowserView('${browser}')" 
+                  class="text-blue-400 hover:underline text-xl mb-6 inline-block hover:text-blue-300 transition">
+            ← Back to URL List
+          </button>
+          <h2 class="text-5xl font-bold text-blue-300 mb-4">${url}</h2>
+          <p class="text-gray-400 text-2xl">Responsive Videos • ${resolutions.length} Resolution${resolutions.length > 1 ? 's' : ''}</p>
         </div>
-      `).join('')}
-    </div>
-  `;
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 max-w-7xl mx-auto px-6">
+          ${selectedBrowsers.map(b => {
+        const browserResults = videoResults.filter(r => r.browser === b);
+        return `
+              <div class="bg-gray-800 rounded-3xl overflow-hidden shadow-2xl border-4 border-gray-700">
+                <div class="bg-gradient-to-r from-blue-800 to-purple-900 p-6 text-center">
+                  <h3 class="text-4xl font-bold text-white tracking-wider">${b}</h3>
+                </div>
+                <div class="p-10 bg-gray-900 space-y-12">
+                  ${browserResults.map(result => `
+                    <div class="group">
+                      <div class="bg-black rounded-2xl overflow-hidden border-4 border-gray-700 shadow-2xl transition-all duration-300 group-hover:border-blue-500">
+                        <video 
+                          controls 
+                          preload="metadata" 
+                          class="w-full h-auto block mx-auto"
+                          style="max-width: 100%; height: auto;">
+                          <source src="${result.video_path}" type="video/mp4">
+                          Your browser does not support the video tag.
+                        </video>
+                      </div>
+                      <div class="mt-6 text-center">
+                        <span class="text-3xl font-bold text-blue-300">${result.resolution.replace('x', ' × ')}</span>
+                      </div>
+                    </div>
+                  `).join('')}
+                </div>
+              </div>
+            `;
+      }).join('')}
+        </div>
+      `;
+    })
+    .catch(err => {
+      console.error('Failed to load video URLs:', err);
+      document.getElementById('content-area').innerHTML = `
+        <div class="text-center">
+          <p class="text-red-400 text-2xl mb-4">Error loading videos</p>
+          <p class="text-gray-400">${err.message || 'Please try again.'}</p>
+        </div>
+      `;
+    });
 }

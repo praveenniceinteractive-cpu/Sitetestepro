@@ -1,24 +1,26 @@
-# auth.py - SUPABASE EDITION
+# auth.py - LOCAL SQLITE EDITION
 import os
+from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 from fastapi import HTTPException, status, Depends
 from sqlalchemy.orm import Session
 from database import SessionLocal
 from dotenv import load_dotenv
-from supabase import create_client, Client
-from gotrue.errors import AuthApiError
+import jwt
+from passlib.context import CryptContext
+import uuid
+from models import User
 
 load_dotenv()
 
 # Configuration
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+SECRET_KEY = os.getenv("SECRET_KEY", "fallback-secret-key-change-me-in-production")
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7 # 1 week
 
-if not SUPABASE_URL or not SUPABASE_KEY:
-    raise ValueError("SUPABASE_URL and SUPABASE_KEY must be set in .env")
-
-# Initialize Supabase Client
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+# Password Hashing
+# Migrated to Argon2 to avoid bcrypt 72-byte limit and version issues
+pwd_context = CryptContext(schemes=["argon2", "bcrypt"], deprecated="auto")
 
 # Database dependency
 def get_db():
@@ -28,78 +30,86 @@ def get_db():
     finally:
         db.close()
 
-# Authentication Logic
-def register_user(email: str, password: str, username: str, db: Session):
-    """Register a new user with Supabase Auth and create local profile."""
-    try:
-        # 1. Sign up with Supabase
-        res = supabase.auth.sign_up({
-            "email": email, 
-            "password": password,
-            "options": {
-                "data": {"username": username}
-            }
-        })
-        
-        if not res.user:
-            raise HTTPException(status_code=400, detail="Registration failed")
-            
-        # 2. Create local profile in public.users
-        from models import User
-        new_user = User(
-            id=res.user.id, # Use Supabase UUID
-            email=email,
-            username=username
-        )
-        db.add(new_user)
-        db.commit()
-        db.refresh(new_user)
-        
-        return new_user
-        
-    except AuthApiError as e:
-        raise HTTPException(status_code=400, detail=e.message)
-    except Exception as e:
-        print(f"Registration Error: {e}")
-        db.rollback()
-        # Check if user was created in Supabase but failed in DB
-        # Ideally we handles this with a transaction or cleanup, 
-        # but for now we raise error.
-        raise HTTPException(status_code=400, detail=str(e))
+import hashlib
 
-def login_user(email: str, password: str):
-    """Login with Supabase Auth."""
-    try:
-        res = supabase.auth.sign_in_with_password({
-            "email": email,
-            "password": password
-        })
-        return res.session
-    except AuthApiError as e:
-        raise HTTPException(status_code=400, detail=e.message)
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+# Hash & Verify
+def verify_password(plain_password, hashed_password):
+    # Try verifying as-is first (backward compatibility)
+    if pwd_context.verify(plain_password, hashed_password):
+        return True
+    
+    # Try verifying the pre-hashed version (for new/long passwords)
+    # This handles the 72-byte bcrypt limit
+    pre_hashed = hashlib.sha256(plain_password.encode()).hexdigest()
+    return pwd_context.verify(pre_hashed, hashed_password)
+
+def get_password_hash(password):
+    # Always pre-hash with SHA256 to ensure length < 72 bytes (hexdigest is 64 chars)
+    # This works for ANY password length
+    pre_hashed = hashlib.sha256(password.encode()).hexdigest()
+    return pwd_context.hash(pre_hashed)
+
+# Token Management
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=15)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
 
 def verify_token(token: str) -> Optional[str]:
-    """Verify a Supabase JWT and return user_id (UUID)."""
+    """Verify a JWT and return user_id (UUID string)."""
     try:
-        # We verify by getting the user object from Supabase
-        # This ensures the token is valid and not revoked
-        res = supabase.auth.get_user(token)
-        if res.user:
-            return res.user.id
-        return None
-    except:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id: str = payload.get("sub")
+        if user_id is None:
+            return None
+        return user_id
+    except jwt.PyJWTError:
         return None
 
-# RLS Helper
-from sqlalchemy import text
-def set_db_session_user(db: Session, user_id: str):
-    """Set the current user ID in the Postgres session for RLS."""
-    try:
-        # Use simple string interpolation for safety against injection if user_id was user input,
-        # but here user_id comes from verified token.
-        # Parameterized query is safer.
-        db.execute(text("SET app.current_user_id = :uid"), {"uid": user_id})
-    except Exception as e:
-        print(f"RLS Setup Error: {e}")
+# User Logic
+def register_user(email: str, password: str, username: str, db: Session):
+    """Register a new user locally."""
+    # Check existing email
+    if db.query(User).filter(User.email == email).first():
+        raise HTTPException(status_code=400, detail="Email already registered")
+    
+    # Check existing username
+    if db.query(User).filter(User.username == username).first():
+        raise HTTPException(status_code=400, detail="Username already taken")
+        
+    new_user_id = str(uuid.uuid4())
+    hashed_pw = get_password_hash(password)
+    
+    user = User(
+        id=new_user_id,
+        email=email,
+        username=username,
+        hashed_password=hashed_pw
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+
+def login_user(email: str, password: str, db: Session):
+    """Login locally and return access token."""
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise HTTPException(status_code=400, detail="Invalid credentials")
+        
+    if not verify_password(password, user.hashed_password):
+        raise HTTPException(status_code=400, detail="Invalid credentials")
+        
+    # Create Token
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user.id, "email": user.email},
+        expires_delta=access_token_expires
+    )
+    
+    return {"access_token": access_token, "token_type": "bearer", "user": user}

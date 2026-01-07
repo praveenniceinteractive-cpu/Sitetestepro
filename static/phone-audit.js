@@ -256,7 +256,7 @@ function displayResults(results) {
     // Count issues
     let totalIssues = 0;
     results.forEach(r => {
-        const issues = JSON.parse(r.issues || '[]');
+        const issues = r.issues || [];
         totalIssues += issues.length;
     });
 
@@ -300,9 +300,9 @@ function displayResults(results) {
                     </thead>
                     <tbody>
                         ${results.map(result => {
-        const phoneNumbers = JSON.parse(result.phone_numbers || '[]');
-        const issues = JSON.parse(result.issues || '[]');
-        const formats = JSON.parse(result.formats_detected || '[]');
+        const phoneNumbers = result.phone_numbers || [];
+        const issues = result.issues || [];
+        const formats = result.formats_detected || [];
 
         const statusClass = result.phone_count === 0 ? 'bg-red-900/50 text-red-300' :
             issues.length === 0 ? 'bg-green-900/50 text-green-300' :
@@ -331,7 +331,14 @@ function displayResults(results) {
                                     <td class="py-4 px-4">
                                         ${phoneNumbers.length > 0 ?
                 `<div class="max-w-xs">
-                                                ${phoneNumbers.map(phone => `<p class="text-sm text-gray-300 mb-1">${phone}</p>`).join('')}
+                                                ${phoneNumbers.map(phone => {
+                    const num = typeof phone === 'object' && phone !== null ? phone.number : phone;
+                    const loc = typeof phone === 'object' && phone !== null ? phone.location : '';
+                    return `<p class="text-sm text-gray-300 mb-1 flex items-center gap-2">
+                                                        ${num}
+                                                        ${loc ? `<span class="text-[10px] px-1.5 py-0.5 rounded bg-gray-700 text-gray-400 border border-gray-600">${loc}</span>` : ''}
+                                                    </p>`;
+                }).join('')}
                                             </div>` :
                 '<p class="text-gray-400 text-sm">No phone numbers found</p>'
             }

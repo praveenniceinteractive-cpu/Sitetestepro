@@ -152,7 +152,7 @@ form.onsubmit = async (e) => {
     sessionId = data.session;
     totalExpected = data.total_expected;
 
-    document.getElementById('status-text').textContent = "Launching browsers and capturing screenshots...";
+    document.getElementById('status-text').textContent = "Initializing...";
 
     pollInterval = setInterval(async () => {
       try {
@@ -164,7 +164,10 @@ form.onsubmit = async (e) => {
         const status = prog.status || "running";
 
         document.getElementById('progress-bar').style.width = `${percent}%`;
-        document.getElementById('progress-bar').textContent = `${percent}%`;
+        const progressText = document.getElementById('progress-text');
+        if (progressText) {
+          progressText.textContent = `${percent}%`;
+        }
         document.getElementById('status-text').textContent = `Captured ${completed} of ${total} screenshots...`;
 
         // Handle different statuses
@@ -363,39 +366,84 @@ function getUniqueFilename(url) {
   }
 }
 
-function showScreenshots(url, browser) {
-  const unique = getUniqueFilename(url);
-  const checkedRes = document.querySelectorAll('input[name="resolution"]:checked');
-  const resolutions = Array.from(checkedRes).map(cb => cb.value);
+async function showScreenshots(url, browser) {
+  const contentArea = document.getElementById('content-area');
 
-  document.getElementById('content-area').innerHTML = `
-    <div class="mb-12 text-center">
-      <button onclick="loadBrowserView('${browser}')" 
-              class="text-cyan-400 hover:underline text-xl mb-6 inline-block hover:text-cyan-300 transition">
-        ← Back to URL List
-      </button>
-      <h2 class="text-4xl font-bold text-cyan-300">${url}</h2>
-      <p class="text-gray-400 mt-3 text-xl">${browser} • ${resolutions.length} Resolution${resolutions.length > 1 ? 's' : ''}</p>
-    </div>
+  try {
+    // Fetch fresh data from API
+    const response = await fetch(`/session-config/static/${sessionId}`);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
 
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12 max-w-7xl mx-auto">
-      ${resolutions.map(res => {
-    const [w, h] = res.split('x');
-    return `
-          <div class="bg-gray-800 rounded-2xl overflow-hidden shadow-2xl border border-gray-700 flex flex-col">
-            <div class="flex-1 bg-black flex items-center justify-center overflow-hidden">
-              <img src="/screenshots/${sessionId}/${browser}/${unique}__${res}.png"
-                   alt="${url} - ${browser} - ${res}"
-                   class="max-w-full max-h-full object-contain"
-                   onerror="this.src='https://via.placeholder.com/1200x800/111111/666666?text=Not+Found';"
-                   loading="lazy"/>
+    const config = await response.json();
+    console.log('Session config loaded:', config);
+
+    // Validate response
+    if (!config || !config.results || !Array.isArray(config.results)) {
+      throw new Error('Invalid response structure from API');
+    }
+
+    // Filter results for this URL and browser
+    const screenshots = config.results.filter(r => r.url === url && r.browser === browser);
+
+    if (screenshots.length === 0) {
+      contentArea.innerHTML = `
+        <div class="text-center py-12">
+          <p class="text-yellow-400 text-2xl">No screenshots found for this URL and browser combination.</p>
+        </div>
+      `;
+      return;
+    }
+
+    contentArea.innerHTML = `
+      <div class="mb-12 text-center">
+        <button onclick="loadBrowserView('${browser}')" 
+                class="text-cyan-400 hover:underline text-xl mb-6 inline-block hover:text-cyan-300 transition">
+          ← Back to URL List
+        </button>
+        <h2 class="text-4xl font-bold text-cyan-300">${url}</h2>
+        <p class="text-gray-400 mt-3 text-xl">${browser} • ${screenshots.length} Screenshot${screenshots.length > 1 ? 's' : ''}</p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12 max-w-7xl mx-auto">
+        ${screenshots.map(screenshot => {
+      // Use screenshot_path if it's a Supabase URL, otherwise construct local path
+      let imageUrl;
+      if (screenshot.screenshot_path && screenshot.screenshot_path.startsWith('http')) {
+        imageUrl = screenshot.screenshot_path;
+      } else if (screenshot.filename) {
+        imageUrl = `/screenshots/${sessionId}/${browser}/${screenshot.filename}`;
+      } else {
+        console.error('No valid path for screenshot:', screenshot);
+        imageUrl = '';
+      }
+
+      const [w, h] = screenshot.resolution.split('x');
+      return `
+            <div class="bg-gray-800 rounded-2xl overflow-hidden shadow-2xl border border-gray-700 flex flex-col">
+              <div class="flex-1 bg-black flex items-center justify-center overflow-hidden">
+                <img src="${imageUrl}"
+                     alt="${url} - ${browser} - ${screenshot.resolution}"
+                     class="max-w-full max-h-full object-contain"
+                     onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22400%22 height=%22300%22><rect width=%22400%22 height=%22300%22 fill=%22%23111%22/><text x=%2250%%22 y=%2250%%22 fill=%22%23666%22 text-anchor=%22middle%22 dy=%22.3em%22>Screenshot Not Found</text></svg>';"
+                     loading="lazy"/>
+              </div>
+              <div class="p-5 bg-gradient-to-r from-cyan-900 to-blue-900 text-center font-bold text-2xl">
+                ${w} × ${h}
+              </div>
             </div>
-            <div class="p-5 bg-gradient-to-r from-cyan-900 to-blue-900 text-center font-bold text-2xl">
-              ${w} × ${h}
-            </div>
-          </div>
-        `;
-  }).join('')}
-    </div>
-  `;
+          `;
+    }).join('')}
+      </div>
+    `;
+  } catch (err) {
+    console.error('Failed to load screenshots:', err);
+    contentArea.innerHTML = `
+      <div class="text-center py-12">
+        <p class="text-red-400 text-2xl mb-4">Error loading screenshots</p>
+        <p class="text-gray-400">${err.message || 'Please try again.'}</p>
+      </div>
+    `;
+  }
 }

@@ -10,13 +10,23 @@ load_dotenv()
 
 # Create database directory if it doesn't exist
 os.makedirs("database", exist_ok=True)
-DATABASE_URL = os.getenv("DATABASE_URL")
+# SQLite Configuration
+DATABASE_URL = "sqlite:///./sitetoolpro.db"
 
-engine = create_engine(DATABASE_URL)
+# Connection pooling configuration
+engine = create_engine(
+    DATABASE_URL,
+    connect_args={"check_same_thread": False}, # Required for SQLite
+    pool_size=10,
+    max_overflow=20,
+    pool_recycle=3600,
+    echo=False
+)
+
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()
 metadata = MetaData()
 
-# We'll use this for async operations
+# Async database instance (currently unused but kept for future async operations)
 database = Database(DATABASE_URL)

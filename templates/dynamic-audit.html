@@ -1,172 +1,170 @@
-<!DOCTYPE html>
-<html lang="en">
+{% extends "base_platform.html" %}
 
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Dynamic Responsive Audit</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link href="/static/style.css" rel="stylesheet" />
-  <script src="https://unpkg.com/lucide@latest"></script>
-</head>
+{% block content %}
+<div class="p-8 max-w-7xl mx-auto min-h-full">
+  <div class="mb-8">
+    <h1 class="text-3xl font-bold text-white mb-2">Dynamic Responsive Audit</h1>
+    <p class="text-gray-400">Interactive videos with scrolling & mouse movement</p>
+  </div>
 
-<body class="bg-gray-900 text-white min-h-screen">
-  <!-- Navigation Bar -->
-  <nav class="bg-gray-800/80 backdrop-blur border-b border-gray-700">
-    <div class="container mx-auto px-6 py-4">
-      <div class="flex justify-between items-center">
-        <div class="text-xl font-bold text-blue-300">Dynamic Audit</div>
-        <div class="flex items-center gap-4">
-          <a href="/responsive" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition">← Back</a>
-          <a href="/" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition">Dashboard</a>
-          <button onclick="logout()" class="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg transition">Logout</button>
+  <!-- UPLOAD & OPTIONS -->
+  <div id="upload-section">
+    <form id="upload-form" class="max-w-5xl mx-auto space-y-8">
+
+      <!-- File Drop -->
+      <div id="drop-zone"
+        class="border-2 border-dashed border-gray-700/50 rounded-2xl p-12 text-center cursor-pointer hover:border-cyan-500 hover:bg-gray-800/30 transition-all bg-gray-900/40">
+        <div class="w-16 h-16 mx-auto mb-4 bg-cyan-500/10 rounded-xl flex items-center justify-center">
+          <i data-lucide="video" class="w-8 h-8 text-cyan-400"></i>
         </div>
+        <p class="text-lg text-gray-300 mb-2">Drop your <strong>urls.txt</strong> file here or click to browse</p>
+        <p class="text-sm text-gray-500 mb-4">One URL per line, plain text format</p>
+        <div class="inline-block text-left bg-gray-800/50 px-4 py-3 rounded-lg border border-gray-700/50">
+          <p class="text-xs text-gray-400 mb-1">Example format:</p>
+          <code class="text-xs text-cyan-400 block">
+            https://example.com<br>
+            https://example.com/about<br>
+            https://example.com/contact
+          </code>
+        </div>
+        <input type="file" id="file-input" accept=".txt" class="hidden" required />
       </div>
-    </div>
-  </nav>
 
-  <div class="container mx-auto px-6 py-12 max-w-7xl">
-    <h1 class="text-5xl font-bold mb-2 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-600">
-      Dynamic Responsive Audit
-    </h1>
-    <p class="text-gray-400 text-lg mb-8">Interactive videos with scrolling & mouse movement</p>
-
-    <!-- UPLOAD & OPTIONS -->
-    <div id="upload-section">
-      <form id="upload-form" class="max-w-4xl mx-auto">
-        <div id="drop-zone"
-          class="border-4 border-dashed border-blue-500/50 rounded-3xl p-20 text-center cursor-pointer hover:border-blue-400 transition-all bg-gray-800/50 mb-10">
-          <div class="w-20 h-20 mx-auto mb-6 bg-blue-500/10 rounded-2xl flex items-center justify-center">
-            <i data-lucide="video" class="w-12 h-12 text-blue-400"></i>
-          </div>
-          <p class="text-xl text-gray-300 mb-3">Drop your <strong>urls.txt</strong> file here or click to browse</p>
-          <p class="text-sm text-gray-500 mb-6">One URL per line, plain text format</p>
-          <div class="inline-block text-left bg-gray-700/50 px-6 py-4 rounded-xl border border-gray-600/50">
-            <p class="text-xs text-gray-400 mb-2">Example format:</p>
-            <code class="text-xs text-blue-400 block">
-              https://example.com<br>
-              https://example.com/about<br>
-              https://example.com/contact
-            </code>
-          </div>
-          <input type="file" id="file-input" accept=".txt" class="hidden" required />
-        </div>
-
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
         <!-- Session Name -->
-        <div class="bg-gray-800/70 rounded-3xl p-8 mb-8">
-          <h3 class="text-2xl font-bold text-blue-300 mb-6">Session Name</h3>
+        <div class="glass-panel rounded-xl p-6">
+          <h3 class="text-lg font-bold text-cyan-300 mb-4">Session Name</h3>
           <input type="text" name="session_name" placeholder="My Dynamic Audit Session" value="My Dynamic Audit Session"
-            class="w-full px-6 py-4 bg-gray-700/50 border border-gray-600 rounded-xl text-xl focus:outline-none focus:border-blue-500">
+            class="w-full px-4 py-3 bg-gray-900/50 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500">
         </div>
 
         <!-- Browser Selection -->
-        <div class="bg-gray-800/70 rounded-3xl p-8 mb-8">
-          <div class="flex justify-between items-center mb-6">
-            <h3 class="text-2xl font-bold text-blue-300">Select Browsers (Video supported on Chrome & Edge)</h3>
-            <label class="flex items-center space-x-2 text-lg text-gray-400 cursor-pointer">
+        <div class="glass-panel rounded-xl p-6">
+          <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-bold text-cyan-300">Select Browsers</h3>
+            <label class="flex items-center space-x-2 text-sm text-gray-400 cursor-pointer">
               <input type="checkbox" id="select-all-browsers"
-                class="w-5 h-5 text-blue-500 rounded border-gray-600 bg-gray-700" onchange="toggleAll('browser', this)">
+                class="w-4 h-4 text-cyan-500 rounded border-gray-600 bg-gray-700" onchange="toggleAll('browser', this)">
               Select All
             </label>
           </div>
-          <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
-            <label class="flex items-center space-x-3 cursor-pointer"><input type="checkbox" name="browser"
-                value="Chrome" class="w-6 h-6 text-blue-500"><span class="text-lg">Chrome</span></label>
-            <label class="flex items-center space-x-3 cursor-pointer"><input type="checkbox" name="browser" value="Edge"
-                class="w-6 h-6 text-blue-500"><span class="text-lg">Edge</span></label>
-            <label class="flex items-center space-x-3 cursor-not-allowed opacity-50"><input type="checkbox"
-                name="browser" value="Firefox" disabled class="w-6 h-6"><span class="text-lg">Firefox (No
+          <div class="grid grid-cols-2 gap-4">
+            <label class="flex items-center space-x-3 cursor-pointer p-2 hover:bg-gray-800/50 rounded"><input
+                type="checkbox" name="browser" value="Chrome"
+                class="w-5 h-5 text-cyan-500 rounded border-gray-600 bg-gray-700"><span
+                class="text-sm">Chrome</span></label>
+            <label class="flex items-center space-x-3 cursor-pointer p-2 hover:bg-gray-800/50 rounded"><input
+                type="checkbox" name="browser" value="Edge"
+                class="w-5 h-5 text-cyan-500 rounded border-gray-600 bg-gray-700"><span
+                class="text-sm">Edge</span></label>
+            <label class="flex items-center space-x-3 cursor-not-allowed opacity-50 p-2"><input type="checkbox"
+                name="browser" value="Firefox" disabled
+                class="w-5 h-5 text-cyan-500 rounded border-gray-600 bg-gray-700"><span class="text-sm">Firefox (No
                 Video)</span></label>
-            <label class="flex items-center space-x-3 cursor-not-allowed opacity-50"><input type="checkbox"
-                name="browser" value="Safari" disabled class="w-6 h-6"><span class="text-lg">Safari (No
+            <label class="flex items-center space-x-3 cursor-not-allowed opacity-50 p-2"><input type="checkbox"
+                name="browser" value="Safari" disabled
+                class="w-5 h-5 text-cyan-500 rounded border-gray-600 bg-gray-700"><span class="text-sm">Safari (No
                 Video)</span></label>
           </div>
         </div>
+      </div>
 
-        <!-- Resolution Selection -->
-        <div class="bg-gray-800/70 rounded-3xl p-8 mb-8">
-          <div class="flex justify-between items-center mb-6">
-            <h3 class="text-2xl font-bold text-blue-300">Select Resolutions</h3>
-            <label class="flex items-center space-x-2 text-lg text-gray-400 cursor-pointer">
-              <input type="checkbox" id="select-all-resolutions"
-                class="w-5 h-5 text-blue-500 rounded border-gray-600 bg-gray-700"
-                onchange="toggleAll('resolution', this)"> Select All
-            </label>
-          </div>
-          <div class="grid grid-cols-2 md:grid-cols-3 gap-6">
-            <label class="flex items-center space-x-3"><input type="checkbox" name="resolution" value="1920x1080"
-                class="w-5 h-5 text-blue-500"><span>Desktop (1920×1080)</span></label>
-            <label class="flex items-center space-x-3"><input type="checkbox" name="resolution" value="1440x900"
-                class="w-5 h-5 text-blue-500"><span>Laptop (1440×900)</span></label>
-            <label class="flex items-center space-x-3"><input type="checkbox" name="resolution" value="1366x768"
-                class="w-5 h-5 text-blue-500"><span>Laptop (1366×768)</span></label>
-            <label class="flex items-center space-x-3"><input type="checkbox" name="resolution" value="1280x720"
-                class="w-5 h-5 text-blue-500"><span>HD (1280×720)</span></label>
-            <label class="flex items-center space-x-3"><input type="checkbox" name="resolution" value="1024x768"
-                class="w-5 h-5 text-blue-500"><span>Tablet Landscape (1024×768)</span></label>
-            <label class="flex items-center space-x-3"><input type="checkbox" name="resolution" value="768x1024"
-                class="w-5 h-5 text-blue-500"><span>Tablet Portrait (768×1024)</span></label>
-            <label class="flex items-center space-x-3"><input type="checkbox" name="resolution" value="375x667"
-                class="w-5 h-5 text-blue-500"><span>Mobile (375×667)</span></label>
-            <label class="flex items-center space-x-3"><input type="checkbox" name="resolution" value="480x800"
-                class="w-5 h-5 text-blue-500"><span>Mobile (480×800)</span></label>
-          </div>
+      <!-- Resolution Selection -->
+      <div class="glass-panel rounded-xl p-6">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-lg font-bold text-cyan-300">Select Resolutions</h3>
+          <label class="flex items-center space-x-2 text-sm text-gray-400 cursor-pointer">
+            <input type="checkbox" id="select-all-resolutions"
+              class="w-4 h-4 text-cyan-500 rounded border-gray-600 bg-gray-700"
+              onchange="toggleAll('resolution', this)"> Select All
+          </label>
         </div>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <label class="flex items-center space-x-3 cursor-pointer p-2 hover:bg-gray-800/50 rounded"><input
+              type="checkbox" name="resolution" value="1920x1080"
+              class="w-4 h-4 text-cyan-500 rounded border-gray-600 bg-gray-700"><span class="text-sm">Desktop
+              (1920×1080)</span></label>
+          <label class="flex items-center space-x-3 cursor-pointer p-2 hover:bg-gray-800/50 rounded"><input
+              type="checkbox" name="resolution" value="1440x900"
+              class="w-4 h-4 text-cyan-500 rounded border-gray-600 bg-gray-700"><span class="text-sm">Laptop
+              (1440×900)</span></label>
+          <label class="flex items-center space-x-3 cursor-pointer p-2 hover:bg-gray-800/50 rounded"><input
+              type="checkbox" name="resolution" value="1366x768"
+              class="w-4 h-4 text-cyan-500 rounded border-gray-600 bg-gray-700"><span class="text-sm">Laptop
+              (1366×768)</span></label>
+          <label class="flex items-center space-x-3 cursor-pointer p-2 hover:bg-gray-800/50 rounded"><input
+              type="checkbox" name="resolution" value="1280x720"
+              class="w-4 h-4 text-cyan-500 rounded border-gray-600 bg-gray-700"><span class="text-sm">HD
+              (1280×720)</span></label>
+          <label class="flex items-center space-x-3 cursor-pointer p-2 hover:bg-gray-800/50 rounded"><input
+              type="checkbox" name="resolution" value="1024x768"
+              class="w-4 h-4 text-cyan-500 rounded border-gray-600 bg-gray-700"><span class="text-sm">Old Desktop
+              (1024×768)</span></label>
+          <label class="flex items-center space-x-3 cursor-pointer p-2 hover:bg-gray-800/50 rounded"><input
+              type="checkbox" name="resolution" value="900x1440"
+              class="w-4 h-4 text-cyan-500 rounded border-gray-600 bg-gray-700"><span class="text-sm">Tablet P
+              (900×1440)</span></label>
+          <label class="flex items-center space-x-3 cursor-pointer p-2 hover:bg-gray-800/50 rounded"><input
+              type="checkbox" name="resolution" value="768x1024"
+              class="w-4 h-4 text-cyan-500 rounded border-gray-600 bg-gray-700"><span class="text-sm">Tablet L
+              (768×1024)</span></label>
+          <label class="flex items-center space-x-3 cursor-pointer p-2 hover:bg-gray-800/50 rounded"><input
+              type="checkbox" name="resolution" value="375x667"
+              class="w-4 h-4 text-cyan-500 rounded border-gray-600 bg-gray-700"><span class="text-sm">Mobile
+              (375×667)</span></label>
+          <label class="flex items-center space-x-3 cursor-pointer p-2 hover:bg-gray-800/50 rounded"><input
+              type="checkbox" name="resolution" value="480x800"
+              class="w-4 h-4 text-cyan-500 rounded border-gray-600 bg-gray-700"><span class="text-sm">Mobile
+              (480×800)</span></label>
+        </div>
+      </div>
 
-        <script>
-          function toggleAll(name, source) {
-            const checkboxes = document.querySelectorAll(`input[name="${name}"]:not([disabled])`);
-            checkboxes.forEach(cb => cb.checked = source.checked);
-          }
-        </script>
+      <button type="submit"
+        class="w-full py-4 bg-gradient-to-r from-cyan-600 to-blue-600 rounded-xl font-bold text-xl hover:from-cyan-500 hover:to-blue-500 shadow-lg shadow-cyan-500/20 transition transform hover:-translate-y-0.5">
+        Start Dynamic Audit
+      </button>
+    </form>
+  </div>
 
-        <button type="submit"
-          class="w-full py-6 bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl font-bold text-3xl hover:from-blue-400 hover:to-purple-500 shadow-2xl">
-          Start Video Audit
+  <!-- PROGRESS -->
+  <div id="progress-section" class="hidden h-full flex items-center justify-center">
+    <div class="glass-panel rounded-2xl p-12 shadow-2xl max-w-2xl mx-auto w-full text-center">
+      <h2 class="text-3xl font-bold text-cyan-400 mb-8">Recording Videos...</h2>
+      <div class="w-full bg-gray-800 rounded-full h-8 mb-6 overflow-hidden border border-gray-700 relative">
+        <div id="progress-bar" class="bg-gradient-to-r from-cyan-500 to-blue-600 h-full transition-all duration-300"
+          style="width: 0%">
+        </div>
+        <div class="absolute inset-0 flex items-center justify-center">
+          <span id="progress-text" class="text-sm font-bold text-white drop-shadow-lg">0%</span>
+        </div>
+      </div>
+      <p id="status-text" class="text-gray-400">Initializing browsers...</p>
+      <div class="mt-8">
+        <button id="stop-button"
+          class="px-6 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 rounded-lg hidden transition"
+          onclick="stopSession()">
+          Stop Session
         </button>
-      </form>
-    </div>
-
-    <!-- PROGRESS -->
-    <div id="progress-section" class="hidden">
-      <div class="bg-gray-800/90 backdrop-blur rounded-3xl p-12 shadow-2xl max-w-5xl mx-auto">
-        <h2 class="text-4xl font-bold text-blue-400 mb-10 text-center">Recording Responsive Videos...</h2>
-        <div class="w-full bg-gray-700 rounded-full h-16 mb-8 overflow-hidden">
-          <div id="progress-bar"
-            class="bg-gradient-to-r from-blue-500 to-purple-600 h-full text-right pr-8 text-2xl font-bold text-white flex items-center justify-end"
-            style="width: 0%">
-            0%
-          </div>
-        </div>
-        <p id="status-text" class="text-center text-2xl text-gray-300">Initializing browsers and recording...</p>
-        <div class="mt-6 text-center">
-          <button id="stop-button" class="px-8 py-3 bg-red-600 hover:bg-red-700 rounded-xl font-bold text-lg hidden"
-            onclick="stopSession()">
-            Stop Session
-          </button>
-        </div>
       </div>
-    </div>
-
-    <!-- RESULTS -->
-    <div id="results-section" class="hidden mt-12">
-      <h2 class="text-4xl font-bold text-center mb-12 text-blue-400">Video Audit Results</h2>
-      <div class="flex justify-center gap-8 mb-12 flex-wrap" id="browser-tabs-container">
-        <!-- Browser tabs will be inserted here -->
-      </div>
-      <div id="content-area" class="min-h-screen"></div>
     </div>
   </div>
 
-  <script src="/static/dynamic-script.js"></script>
-  <script>
-    lucide.createIcons();
+  <!-- RESULTS -->
+  <div id="results-section" class="hidden mt-8">
+    <h2 class="text-2xl font-bold mb-6 text-white border-b border-gray-800 pb-4">Audit Results</h2>
+    <div class="flex gap-2 mb-8 overflow-x-auto pb-2" id="browser-tabs-container">
+      <!-- Browser tabs will be inserted here -->
+    </div>
+    <div id="content-area" class="min-h-[500px]"></div>
+  </div>
+</div>
 
-    function logout() {
-      document.cookie = "access_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-      window.location.href = "/login";
-    }
-  </script>
-</body>
+<script>
+  function toggleAll(name, source) {
+    const checkboxes = document.querySelectorAll(`input[name="${name}"]:not([disabled])`);
+    checkboxes.forEach(cb => cb.checked = source.checked);
+  }
+</script>
 
-</html>
+<script src="/static/dynamic-script.js"></script>
+{% endblock %}
