@@ -39,6 +39,7 @@ import database
 import models
 import auth
 from config import settings
+import permissions # Import permissions logic
 
 
 # Create necessary directories
@@ -100,6 +101,19 @@ class LoginRequest(BaseModel):
 class RegisterRequest(BaseModel):
     email: str
     username: str
+    username: str
+    password: str
+
+class ShareRequest(BaseModel):
+    email: str
+    role: str
+    resource_id: str
+    resource_id: str
+    resource_type: str = "audit_session"
+
+class SubUserRequest(BaseModel):
+    username: str
+    email: str
     password: str
 
 # ========== AUTHENTICATION MIDDLEWARE ==========
@@ -107,15 +121,29 @@ class RegisterRequest(BaseModel):
 async def get_current_user_from_cookie(request: Request, db: Session = Depends(auth.get_db)):
     token = request.cookies.get("access_token")
     if not token:
+        print("DEBUG: No access_token cookie found in request")
+        print(f"DEBUG: Cookies received: {request.cookies.keys()}")
         return None
     try:
         # Use the verify_token function from auth.py
+        print(f"DEBUG: Token found: {token[:10]}...")
         user_id = auth.verify_token(token)
         if not user_id:
+            print("DEBUG: auth.verify_token returned None")
             return None
         
         # Get user from database - ID is now String (UUID)
+        print(f"DEBUG: User ID from token: {user_id}")
         user = db.query(models.User).filter(models.User.id == user_id).first()
+        if not user:
+             print(f"DEBUG: User not found in DB for ID: {user_id}")
+             # DB Debug - list all users
+             all_users = db.query(models.User).all()
+             print(f"DEBUG: Total users in DB: {len(all_users)}")
+             for u in all_users:
+                 print(f"DEBUG: Found User - ID: '{u.id}', Username: '{u.username}', Email: '{u.email}'")
+        else:
+             print(f"DEBUG: Authenticated user: {user.username}")
         return user
     except Exception as e:
         print(f"Authentication error: {e}")
@@ -136,6 +164,79 @@ async def require_auth(request: Request, db: Session = Depends(auth.get_db)):
     # auth.set_db_session_user(db, user.id)
     
     return user
+
+# ========== SHARE API ==========
+
+@app.post("/api/share")
+async def share_resource(
+    share_data: ShareRequest,
+    current_user: models.User = Depends(require_auth),
+    db: Session = Depends(auth.get_db)
+):
+    """
+    Share a resource (e.g. session) with another user.
+    """
+    # 1. Check if current user has permission to manage/share this resource
+    # For simplicity, allow if they are "Owner" or simply if they have access for now.
+    # Ideally: check_permission(current_user.id, share_data.resource_id, "session:share")
+    # For this demo: We assume if you can access it, you can share it, 
+    # OR we check if you are the Owner.
+    
+    # 2. Find target user
+    target_user = db.query(models.User).filter(models.User.email == share_data.email).first()
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    # 3. Assign Role
+    try:
+        permissions.assign_role(
+            db,
+            user_id=target_user.id,
+            resource_type=share_data.resource_type,
+            resource_id=share_data.resource_id,
+            role_name=share_data.role
+        )
+        return {"message": f"Successfully shared with {target_user.email} as {share_data.role}"}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        print(f"Share error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to share resource")
+
+@app.post("/api/sub-user")
+async def create_sub_user(
+    request: SubUserRequest,
+    current_user: models.User = Depends(require_auth),
+    db: Session = Depends(auth.get_db)
+):
+    """Create a sub-user account linked to the current user"""
+    # 1. Check if current user is allowed to create users
+    if not current_user.can_create_users:
+        raise HTTPException(status_code=403, detail="You do not have permission to create accounts.")
+
+    # 2. Check existence
+    if db.query(models.User).filter((models.User.email == request.email) | (models.User.username == request.username)).first():
+        raise HTTPException(status_code=400, detail="Username or Email already taken")
+
+    # 3. Create User
+    new_user_id = str(uuid.uuid4())
+    hashed_pw = auth.get_password_hash(request.password)
+    
+    new_user = models.User(
+        id=new_user_id,
+        email=request.email,
+        username=request.username,
+        hashed_password=hashed_pw,
+        parent_id=current_user.id,
+        can_create_users=False  # Sub-users cannot create more users
+    )
+    
+    db.add(new_user)
+    db.commit()
+    
+    return {"message": "Sub-user created successfully. They can now log in."}
+
+
 
 # ========== UNIQUE FILENAME FUNCTION ==========
 
@@ -364,7 +465,12 @@ async def record_videos_async(urls: List[str], selected_browsers: List[str],
 
     try:
         async with async_playwright() as p:
-            browser_map = {"Chrome": p.chromium, "Edge": p.chromium}
+            browser_map = {
+                "Chrome": p.chromium, 
+                "Edge": p.chromium,
+                "Firefox": p.firefox,
+                "Safari": p.webkit
+            }
 
             # AGGRESSIVE OPTIMIZATION: 3 Videos in parallel (High cpu load)
             sem = asyncio.Semaphore(3)
@@ -912,7 +1018,7 @@ def dynamic_audit_task(urls: List[str], browsers: List[str], resolutions: List[s
             urls=json.dumps(urls),
             browsers=json.dumps(browsers),
             resolutions=json.dumps(resolutions),
-            total_expected=len(urls) * len([b for b in browsers if b in ["Chrome", "Edge"]]) * len(resolutions),
+            total_expected=len(urls) * len(browsers) * len(resolutions),
             status="running"
         )
         db.add(session)
@@ -994,7 +1100,8 @@ async def dashboard(request: Request, user = Depends(require_auth)):
     return templates.TemplateResponse("index.html", {
         "request": request, 
         "user": user,
-        "show_nav": True
+        "show_nav": True,
+        "is_impersonating": request.cookies.get("impersonator_token") is not None
     })
 
 @app.get("/login")
@@ -1010,6 +1117,94 @@ async def logout():
     response = RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
     response.delete_cookie("access_token")
     return response
+
+@app.post("/api/impersonate/{user_id}")
+async def impersonate_user(
+    user_id: str,
+    response: Response,
+    request: Request,
+    current_user: models.User = Depends(require_auth),
+    db: Session = Depends(auth.get_db)
+):
+    """
+    Allow a parent user to log in as one of their sub-users without a password.
+    """
+    # 1. Verify Parent-Child Relationship
+    target_user = db.query(models.User).filter_by(id=user_id).first()
+    
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    if target_user.parent_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You can only impersonate your own sub-users.")
+        
+    # 2. Generate Token for Target User
+    access_token_expires = timedelta(minutes=auth.ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = auth.create_access_token(
+        data={"sub": target_user.id, "email": target_user.email},
+        expires_delta=access_token_expires
+    )
+    
+    # 3. Set cookie and return success 
+    
+    # Store the CURRENT (admin) token in a separate cookie to allow reverting
+    # Store the CURRENT (admin) token in a separate cookie to allow reverting
+    current_token = request.cookies.get("access_token")
+    print(f"DEBUG: impersonate_user - Current Token: {current_token[:10]}...")
+    
+    if current_token:
+        print("DEBUG: Setting impersonator_token cookie")
+        response.set_cookie(
+            key="impersonator_token",
+            value=current_token,
+            httponly=True,
+            max_age=3600, # 1 hour to revert
+            expires=3600,
+            samesite="Lax",
+            secure=False
+        )
+    else:
+        print("DEBUG: No current access_token found to save as impersonator_token")
+    
+    response.set_cookie(
+        key="access_token",
+        value=f"{access_token}",
+        httponly=True,
+        max_age=1800,
+        expires=1800,
+        samesite="Lax",
+        secure=False 
+    )
+    
+    return {"message": f"Logged in as {target_user.username}", "redirect_url": "/platform/dashboard"}
+
+@app.post("/api/revert-impersonation")
+async def revert_impersonation(response: Response, request: Request):
+    """Revert back to the admin account"""
+    impersonator_token = request.cookies.get("impersonator_token")
+    if not impersonator_token:
+        raise HTTPException(status_code=400, detail="No admin session to revert to")
+        
+    # Validations could go here (verify token is still valid)
+    
+    # Create the redirect response object
+    redirect_rx = RedirectResponse(url="/platform/dashboard", status_code=status.HTTP_303_SEE_OTHER)
+    
+    # Restore the admin token ON the redirect response
+    redirect_rx.set_cookie(
+        key="access_token",
+        value=impersonator_token,
+        httponly=True,
+        max_age=1800, # Reset expiry
+        expires=1800,
+        samesite="Lax",
+        secure=False
+    )
+    
+    # Clear the breadcrumb
+    redirect_rx.delete_cookie("impersonator_token")
+    
+    return redirect_rx
 
 @app.get("/register")
 async def register_page(request: Request, db: Session = Depends(auth.get_db)):
@@ -1063,23 +1258,64 @@ async def profile_page(request: Request, db: Session = Depends(auth.get_db)):
     pct_h1 = calc_pct(h1_sessions, total_sessions)
     pct_phone = calc_pct(phone_sessions, total_sessions)
     
+    # Fetch Sub-Users (if this user is an admin/creator)
+    sub_users = []
+    if user.can_create_users:
+        sub_users = db.query(models.User).filter_by(parent_id=user.id).all()
+        
+    print(f"DEBUG: Profile Cookies: {request.cookies.keys()}")
+    print(f"DEBUG: impersonator_token present: {request.cookies.get('impersonator_token') is not None}")
     return templates.TemplateResponse("profile.html", {
         "request": request,
         "user": user,
-        "sessions": sessions,
+        "sub_users": sub_users,
         "total_sessions": total_sessions,
-        "completed_sessions": completed_sessions,
-        "running_sessions": running_sessions,
-        "static_sessions": static_sessions,
-        "dynamic_sessions": dynamic_sessions,
-        "h1_sessions": h1_sessions,
-        "phone_sessions": phone_sessions,
-        "pct_completed": pct_completed,
-        "pct_running": pct_running,
-        "pct_static": pct_static,
-        "pct_dynamic": pct_dynamic,
-        "pct_h1": pct_h1,
-        "pct_phone": pct_phone
+        "is_impersonating": request.cookies.get("impersonator_token") is not None
+    })
+
+
+@app.get("/history")
+async def history_page(request: Request, db: Session = Depends(auth.get_db)):
+    """History page - requires authentication"""
+    user = await get_current_user_from_cookie(request, db)
+    if not user:
+        return RedirectResponse("/login")
+    
+    # Combined Query: Owned OR Shared OR (If sub-user) Parent's Sessions
+    criteria = [models.AuditSession.user_id == user.id]
+    
+    # Add shared sessions (basic implementation - fetch all shared roles)
+    shared_roles = db.query(models.UserResourceRole).filter_by(
+        user_id=user.id,
+        resource_type="audit_session"
+    ).all()
+    if shared_roles:
+         shared_ids = [r.resource_id for r in shared_roles]
+         if shared_ids:
+             criteria.append(models.AuditSession.session_id.in_(shared_ids))
+
+    # Add parent sessions if applicable
+    if user.parent_id:
+        criteria.append(models.AuditSession.user_id == user.parent_id)
+    
+    from sqlalchemy import or_
+    sessions = db.query(models.AuditSession).filter(or_(*criteria)).order_by(models.AuditSession.created_at.desc()).all()
+    
+    # Parse JSON strings
+    for session in sessions:
+        try:
+            session.urls = json.loads(session.urls)
+        except:
+            session.urls = []
+            
+    # Calculate stats (needed for the table badges/sorting potentially?)
+    # Actually, history page focuses on the table.
+    
+    return templates.TemplateResponse("history.html", {
+        "request": request,
+        "user": user,
+        "sessions": sessions,
+        "is_impersonating": request.cookies.get("impersonator_token") is not None
     })
 
 @app.get("/responsive")
@@ -1100,12 +1336,32 @@ async def static_results_view(session_id: str, request: Request, db: Session = D
         return RedirectResponse("/login")
         
     session = db.query(models.AuditSession).filter(
-        models.AuditSession.session_id == session_id,
-        models.AuditSession.user_id == user.id
+        models.AuditSession.session_id == session_id
     ).first()
     
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
+
+    has_access = False
+    has_access = False
+    if session.user_id == user.id:
+        has_access = True
+    elif user.parent_id and session.user_id == user.parent_id:
+        has_access = True
+    else:
+        # Check Shared Access
+        shared_role = db.query(models.UserResourceRole).filter_by(
+            user_id=user.id,
+            resource_type="audit_session",
+            resource_id=session_id
+        ).first()
+        if shared_role:
+             has_access = True
+             
+    if not has_access:
+        raise HTTPException(status_code=403, detail="Not authorized to view this session")
+    
+
         
     # Parse JSON fields
     try:
@@ -1139,7 +1395,8 @@ async def static_results_view(session_id: str, request: Request, db: Session = D
         "results": results,
         "results_data": json.dumps(results_list),
         "results_json": json.dumps([r.url for r in results]),
-        "cache_buster": cache_buster  # Force browser to reload template
+        "cache_buster": cache_buster,  # Force browser to reload template
+        "is_impersonating": request.cookies.get("impersonator_token") is not None
     })
 
 
@@ -1439,12 +1696,23 @@ async def delete_session(session_id: str, request: Request, db: Session = Depend
          raise HTTPException(status_code=401, detail="Not authenticated")
          
     session = db.query(models.AuditSession).filter(
-        models.AuditSession.session_id == session_id,
-        models.AuditSession.user_id == user.id
+        models.AuditSession.session_id == session_id
     ).first()
     
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
+        
+    # Permission Check: Owner or Sub-User of Owner
+    has_permission = False
+    if session.user_id == user.id:
+        has_permission = True
+    elif user.parent_id and session.user_id == user.parent_id:
+        has_permission = True
+        
+    if not has_permission:
+        raise HTTPException(status_code=403, detail="Not authorized to delete this session")
+    
+
         
     try:
         perform_session_cleanup(session_id, db)
@@ -1564,9 +1832,9 @@ async def upload_dynamic(
     selected_browsers = json.loads(browsers)
     selected_resolutions = json.loads(resolutions)
 
-    supported_browsers = [b for b in selected_browsers if b in ["Chrome", "Edge"]]
+    supported_browsers = selected_browsers
     if not supported_browsers:
-        return JSONResponse({"error": "Select Chrome or Edge for video recording"}, status_code=400)
+        return JSONResponse({"error": "Select at least one browser for video recording"}, status_code=400)
 
     if not selected_resolutions:
         return JSONResponse({"error": "Select at least one resolution"}, status_code=400)
@@ -1857,9 +2125,30 @@ async def view_results(session_type: str, session_id: str, request: Request, db:
         return RedirectResponse("/login")
     
     # Verify ownership
-    session = db.query(models.AuditSession).filter_by(session_id=session_id, user_id=user.id).first()
+    # Verify ownership OR shared access
+    # 1. Check ownership
+    session = db.query(models.AuditSession).filter_by(session_id=session_id).first()
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
+        
+    has_access = False
+    if session.user_id == user.id:
+        has_access = True
+    # 2. Check Parent Access (Sub-user viewing parent's session)
+    elif user.parent_id and session.user_id == user.parent_id:
+        has_access = True
+    else:
+        # 3. Check Shared Access
+        shared_role = db.query(models.UserResourceRole).filter_by(
+            user_id=user.id,
+            resource_type="audit_session",
+            resource_id=session_id
+        ).first()
+        if shared_role:
+             has_access = True
+             
+    if not has_access:
+        raise HTTPException(status_code=403, detail="Not authorized to view this session")
     
     # Check if session is completed
     if session.status != "completed":
@@ -2389,18 +2678,42 @@ async def audit_performance_logic(urls: List[str], session_id: str):
 @app.get("/platform/dashboard", response_class=HTMLResponse)
 async def platform_dashboard(request: Request, user: models.User = Depends(require_auth), db: Session = Depends(auth.get_db)):
     # Stats
-    total_sessions = db.query(models.AuditSession).filter(models.AuditSession.user_id == user.id).count()
-    recent_sessions = db.query(models.AuditSession).filter(models.AuditSession.user_id == user.id).order_by(models.AuditSession.created_at.desc()).limit(5).all()
+    # Fetch Shared Sessions (ACM)
+    shared_session_roles = db.query(models.UserResourceRole).filter(
+        models.UserResourceRole.user_id == user.id,
+        models.UserResourceRole.resource_type == "audit_session"
+    ).all()
+    
+    shared_session_ids = [role.resource_id for role in shared_session_roles]
+    
+    # Combined Query: Owned OR Shared OR (If sub-user) Parent's Sessions
+    
+    # Base criteria: Owned sessions
+    criteria = [models.AuditSession.user_id == user.id]
+    
+    # Add shared sessions
+    if shared_session_ids:
+        criteria.append(models.AuditSession.session_id.in_(shared_session_ids))
+        
+    # Add parent sessions if applicable
+    if user.parent_id:
+        criteria.append(models.AuditSession.user_id == user.parent_id)
+    
+    from sqlalchemy import or_
+    base_query = db.query(models.AuditSession).filter(or_(*criteria))
+    
+    total_sessions = base_query.count()
+    recent_sessions = base_query.order_by(models.AuditSession.created_at.desc()).limit(5).all()
     
     # Calculate simple pass rate (mock)
-    completed = db.query(models.AuditSession).filter(models.AuditSession.user_id == user.id, models.AuditSession.status == "completed").count()
+    completed = base_query.filter(models.AuditSession.status == "completed").count()
     success_rate = int((completed / total_sessions * 100)) if total_sessions > 0 else 0
     
     # Mock active jobs for now
-    active_jobs = db.query(models.AuditSession).filter(models.AuditSession.user_id == user.id, models.AuditSession.status == "running").count()
+    active_jobs = base_query.filter(models.AuditSession.status == "running").count()
 
-    # Calculate Total Issues Detected
-    user_sessions = db.query(models.AuditSession.session_id).filter(models.AuditSession.user_id == user.id).all()
+    # Calculate Total Issues Detected (All visible sessions)
+    user_sessions = base_query.with_entities(models.AuditSession.session_id).all()
     user_session_ids = [s[0] for s in user_sessions]
     
     total_issues = 0
@@ -2433,7 +2746,8 @@ async def platform_dashboard(request: Request, user: models.User = Depends(requi
         "success_rate": success_rate,
         "recent_sessions": recent_sessions,
         "active_jobs": active_jobs,
-        "total_issues": total_issues
+        "total_issues": total_issues,
+        "is_impersonating": request.cookies.get("impersonator_token") is not None
     })
 
 @app.get("/platform/device-lab", response_class=HTMLResponse)
@@ -2558,10 +2872,28 @@ async def get_static_session_config(session_id: str, request: Request, db: Sessi
     if not user:
         raise HTTPException(status_code=401)
     
-    session = db.query(models.AuditSession).filter_by(session_id=session_id, user_id=user.id).first()
+    session = db.query(models.AuditSession).filter_by(session_id=session_id).first()
     print(f"[DB] Session found: {session is not None}", flush=True)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
+        
+    has_access = False
+    if session.user_id == user.id:
+        has_access = True
+    elif user.parent_id and session.user_id == user.parent_id:
+        has_access = True
+    else:
+        # Check Shared Access
+        shared_role = db.query(models.UserResourceRole).filter_by(
+            user_id=user.id,
+            resource_type="audit_session",
+            resource_id=session_id
+        ).first()
+        if shared_role:
+             has_access = True
+             
+    if not has_access:
+        raise HTTPException(status_code=403, detail="Not authorized to view this session")
     
     # Get all results with actual file paths
     results = db.query(models.StaticAuditResult).filter_by(session_id=session_id).all()

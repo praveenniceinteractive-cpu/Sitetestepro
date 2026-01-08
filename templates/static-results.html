@@ -58,6 +58,19 @@
                     <a href="/profile" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition">
                         ← Back to Profile
                     </a>
+                    <button onclick="openShareModal()"
+                        class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                            class="lucide lucide-share-2">
+                            <circle cx="18" cy="5" r="3" />
+                            <circle cx="6" cy="12" r="3" />
+                            <circle cx="18" cy="19" r="3" />
+                            <line x1="8.59" x2="15.42" y1="13.51" y2="17.49" />
+                            <line x1="15.41" x2="8.59" y1="6.51" y2="10.49" />
+                        </svg>
+                        Share
+                    </button>
                     <a href="/" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition">Dashboard</a>
                     <button onclick="logout()"
                         class="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg transition">Logout</button>
@@ -109,6 +122,40 @@
         <!-- Results Area -->
         <div id="content-area" class="min-h-screen">
             <!-- Content will be loaded here via JavaScript -->
+        </div>
+    </div>
+
+    </div>
+
+    <!-- Share Modal -->
+    <div id="shareModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden items-center justify-center z-50">
+        <div class="bg-gray-800 border border-gray-700 rounded-xl p-6 w-full max-w-md shadow-2xl">
+            <h3 class="text-xl font-bold text-white mb-4">Share this Audit Session</h3>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-1">Email Address</label>
+                    <input type="email" id="shareEmail" placeholder="colleague@example.com"
+                        class="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-cyan-500">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-1">Role</label>
+                    <select id="shareRole"
+                        class="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-cyan-500">
+                        <option value="Viewer">Viewer (Read Only)</option>
+                        <option value="Editor">Editor (Can Update)</option>
+                        <option value="Owner">Owner (Full Access)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-3 mt-6">
+                <button onclick="closeShareModal()"
+                    class="px-4 py-2 text-gray-400 hover:text-white transition">Cancel</button>
+                <button onclick="submitShare()"
+                    class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition">Share</button>
+            </div>
         </div>
     </div>
 
@@ -318,6 +365,55 @@
                         <p class="text-gray-400">${err.message || 'Please try again.'}</p>
                     </div>
                 `;
+            }
+        }
+
+
+
+        // Share functionality
+        function openShareModal() {
+            document.getElementById('shareModal').classList.remove('hidden');
+            document.getElementById('shareModal').classList.add('flex');
+        }
+
+        function closeShareModal() {
+            document.getElementById('shareModal').classList.add('hidden');
+            document.getElementById('shareModal').classList.remove('flex');
+        }
+
+        async function submitShare() {
+            const email = document.getElementById('shareEmail').value;
+            const role = document.getElementById('shareRole').value;
+
+            if (!email) {
+                alert('Please enter an email address');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/share', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        email: email,
+                        role: role,
+                        resource_id: sessionId,
+                        resource_type: 'audit_session'
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    alert(data.message);
+                    closeShareModal();
+                } else {
+                    alert('Error: ' + (data.detail || 'Failed to share'));
+                }
+            } catch (error) {
+                alert('Network error: ' + error.message);
             }
         }
 

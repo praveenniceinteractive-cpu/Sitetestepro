@@ -119,7 +119,7 @@
 
                 if (response.ok) {
                     document.cookie = `access_token=${result.access_token}; path=/`;
-                    window.location.href = '/';
+                    window.location.href = '/platform/dashboard';
                 } else {
                     Swal.fire({
                         icon: 'error',

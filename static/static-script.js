@@ -37,24 +37,11 @@ fileInput.onchange = () => {
 form.onsubmit = async (e) => {
   e.preventDefault();
 
-  // Check authentication
+  // Check authentication - REMOVED (Handled by HttpOnly Cookies)
+  /* 
   const token = getToken();
-  if (!token) {
-    Swal.fire({
-      icon: 'warning',
-      title: 'Authentication Required',
-      text: 'Please log in to start an audit.',
-      background: '#0f172a',
-      color: '#f8fafc',
-      confirmButtonColor: '#3b82f6',
-      confirmButtonText: 'Go to Login'
-    }).then((result) => {
-      if (result.isConfirmed) {
-        window.location.href = "/login";
-      }
-    });
-    return;
-  }
+  if (!token) { ... } 
+  */
 
   const manualText = document.getElementById('manual-urls').value.trim();
   let fileToUpload = fileInput.files[0];
@@ -130,9 +117,7 @@ form.onsubmit = async (e) => {
   try {
     const res = await fetch("/upload/static", {
       method: "POST",
-      headers: {
-        'Authorization': `Bearer ${token}`
-      },
+      // Headers removed - Auth handled by cookie
       body: formData
     });
 
@@ -235,7 +220,7 @@ async function stopSession() {
   }
 
   const token = getToken();
-  if (!token) {
+  if (false && !token) {
     Swal.fire({
       icon: 'warning',
       title: 'Authentication Required',
@@ -256,9 +241,7 @@ async function stopSession() {
 
     const response = await fetch(`/api/sessions/${sessionId}/stop`, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
+      // headers: { 'Authorization': `Bearer ${token}` }
     });
 
     if (response.ok) {

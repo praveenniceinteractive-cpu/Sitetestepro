@@ -17,6 +17,10 @@ class User(Base):
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow, index=True)
     
+    # Hierarchical User Management
+    parent_id = Column(String, ForeignKey("users.id"), nullable=True) # Link to creator
+    can_create_users = Column(Boolean, default=True) # Permission flag
+    
     def __repr__(self):
         return f"<User(id='{self.id}', username='{self.username}', email='{self.email}')>"
 
@@ -152,6 +156,57 @@ class DynamicAuditResult(Base):
     video_path = Column(String, nullable=False)
     filename = Column(String, nullable=False)
     created_at = Column(DateTime, default=datetime.datetime.utcnow, index=True)
+
+# ========== ACCESS CONTROL MATRIX (ACM) / RBAC MODELS ==========
+
+class Permission(Base):
+    __tablename__ = "permissions"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    codename = Column(String, unique=True, index=True, nullable=False) # e.g. "session:read"
+    description = Column(String)
     
     def __repr__(self):
-        return f"<DynamicAuditResult(session_id='{self.session_id}', url='{self.url}', browser='{self.browser}')>"
+        return f"<Permission(codename='{self.codename}')>"
+
+class Role(Base):
+    __tablename__ = "roles"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, unique=True, index=True, nullable=False) # e.g. "Owner", "Viewer"
+    description = Column(String)
+    
+    def __repr__(self):
+        return f"<Role(name='{self.name}')>"
+
+class RolePermission(Base):
+    __tablename__ = "role_permissions"
+    
+    role_id = Column(Integer, ForeignKey("roles.id"), primary_key=True)
+    permission_id = Column(Integer, ForeignKey("permissions.id"), primary_key=True)
+
+class UserResourceRole(Base):
+    """
+    The ACM Table: Assigns a User a Role on a specific Resource.
+    """
+    __tablename__ = "user_resource_roles"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    role_id = Column(Integer, ForeignKey("roles.id"), nullable=False)
+    
+    # Polymorphic Resource Link
+    resource_type = Column(String, nullable=False, index=True) # e.g. "audit_session"
+    resource_id = Column(String, nullable=False, index=True)   # ID of the resource
+    
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    
+    # Check constraint could be added in real SQL, here we rely on app logic + unique index
+    # Ensure one role per user per resource
+    __table_args__ = (
+        # from sqlalchemy import UniqueConstraint (need to import if used, or define like this)
+        # UniqueConstraint('user_id', 'resource_type', 'resource_id', name='unique_user_resource_role'),
+    )
+    
+    def __repr__(self):
+        return f"<UserResourceRole(user='{self.user_id}', role='{self.role_id}', resource='{self.resource_type}:{self.resource_id}')>"

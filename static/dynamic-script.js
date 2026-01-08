@@ -38,23 +38,11 @@ form.onsubmit = async (e) => {
   e.preventDefault();
 
   // Check authentication
+  // Check authentication - REMOVED (Handled by HttpOnly Cookies)
+  /* 
   const token = getToken();
-  if (!token) {
-    Swal.fire({
-      icon: 'warning',
-      title: 'Authentication Required',
-      text: 'Please log in to start an audit.',
-      background: '#0f172a',
-      color: '#f8fafc',
-      confirmButtonColor: '#3b82f6',
-      confirmButtonText: 'Go to Login'
-    }).then((result) => {
-      if (result.isConfirmed) {
-        window.location.href = "/login";
-      }
-    });
-    return;
-  }
+  if (!token) { ... } 
+  */
 
   const manualText = document.getElementById('manual-urls').value.trim();
   let fileToUpload = fileInput.files[0];
@@ -76,7 +64,7 @@ form.onsubmit = async (e) => {
   }
 
   selectedBrowsers = Array.from(document.querySelectorAll('input[name="browser"]:checked'))
-    .map(cb => cb.value).filter(b => b === "Chrome" || b === "Edge");
+    .map(cb => cb.value);
 
   const selectedResolutions = Array.from(document.querySelectorAll('input[name="resolution"]:checked'))
     .map(cb => cb.value);
@@ -87,7 +75,7 @@ form.onsubmit = async (e) => {
     Swal.fire({
       icon: 'info',
       title: 'Browser Selection Required',
-      text: 'Please select at least one supported browser (Chrome or Edge).',
+      text: 'Please select at least one browser.',
       background: '#0f172a',
       color: '#f8fafc',
       confirmButtonColor: '#3b82f6'
@@ -131,9 +119,7 @@ form.onsubmit = async (e) => {
   try {
     const res = await fetch("/upload/dynamic", {
       method: "POST",
-      headers: {
-        'Authorization': `Bearer ${token}`
-      },
+      // Headers removed
       body: formData
     });
 
@@ -236,7 +222,7 @@ async function stopSession() {
   }
 
   const token = getToken();
-  if (!token) {
+  if (false && !token) {
     Swal.fire({
       icon: 'warning',
       title: 'Authentication Required',
@@ -257,9 +243,7 @@ async function stopSession() {
 
     const response = await fetch(`/api/sessions/${sessionId}/stop`, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
+      // headers: { 'Authorization': `Bearer ${token}` }
     });
 
     if (response.ok) {
@@ -383,8 +367,8 @@ function showVideos(url, browser) {
         throw new Error('Invalid response structure from API');
       }
 
-      // Filter results for this URL and browser
-      const videoResults = config.results.filter(r => r.url === url && r.browser === browser);
+      // Filter results for this URL (ALL browsers)
+      const videoResults = config.results.filter(r => r.url === url);
 
       if (videoResults.length === 0) {
         document.getElementById('content-area').innerHTML = `

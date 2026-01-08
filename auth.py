@@ -105,10 +105,13 @@ def login_user(email: str, password: str, db: Session):
     if not verify_password(password, user.hashed_password):
         raise HTTPException(status_code=400, detail="Invalid credentials")
         
+    print(f"DEBUG: login_user - User ID: {user.id} (Type: {type(user.id)})")
+    print(f"DEBUG: login_user - Username: {user.username}")
+    
     # Create Token
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": user.id, "email": user.email},
+        data={"sub": str(user.id), "email": user.email},
         expires_delta=access_token_expires
     )
     

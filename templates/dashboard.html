@@ -8,11 +8,55 @@
             <h1 class="text-3xl font-semibold text-white tracking-tight">Dashboard</h1>
             <p class="text-slate-400 mt-1">Overview of your audit performance and recent activity.</p>
         </div>
-        <a href="/responsive"
-            class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-lg shadow-lg shadow-blue-500/20 transition-all flex items-center gap-2">
-            <i data-lucide="plus" class="w-4 h-4"></i>
-            <span>New Audit</span>
-        </a>
+        <div class="flex gap-4">
+            {% if user.can_create_users %}
+            <button onclick="openCreateUserModal()"
+                class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-lg shadow-lg shadow-blue-500/20 transition-all flex items-center gap-2">
+                <i data-lucide="user-plus" class="w-4 h-4"></i>
+                <span>Add User</span>
+            </button>
+            {% endif %}
+            <a href="/responsive"
+                class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-lg shadow-lg shadow-blue-500/20 transition-all flex items-center gap-2">
+                <i data-lucide="plus" class="w-4 h-4"></i>
+                <span>New Audit</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Create User Modal -->
+    <div id="createUserModal"
+        class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden items-center justify-center z-50">
+        <div class="bg-gray-800 border border-gray-700 rounded-xl p-6 w-full max-w-md shadow-2xl">
+            <h3 class="text-xl font-bold text-white mb-4">Create Sub-User</h3>
+            <p class="text-slate-400 text-sm mb-4">Create a viewer account that can access your audit data.</p>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-1">Username</label>
+                    <input type="text" id="newUsername" placeholder="username"
+                        class="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-1">Email</label>
+                    <input type="email" id="newEmail" placeholder="user@example.com"
+                        class="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-1">Password</label>
+                    <input type="password" id="newPassword" placeholder="********"
+                        class="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-blue-500">
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-3 mt-6">
+                <button onclick="closeCreateUserModal()"
+                    class="px-4 py-2 text-gray-400 hover:text-white transition">Cancel</button>
+                <button onclick="submitCreateUser()"
+                    class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition">Create
+                    Account</button>
+            </div>
+        </div>
     </div>
 
     <!-- KPI Grid -->
@@ -211,5 +255,53 @@
             }
         }
     });
+
+
+    // Create User Modal Functions
+    function openCreateUserModal() {
+        document.getElementById('createUserModal').classList.remove('hidden');
+        document.getElementById('createUserModal').classList.add('flex');
+    }
+
+    function closeCreateUserModal() {
+        document.getElementById('createUserModal').classList.add('hidden');
+        document.getElementById('createUserModal').classList.remove('flex');
+    }
+
+    async function submitCreateUser() {
+        const username = document.getElementById('newUsername').value;
+        const email = document.getElementById('newEmail').value;
+        const password = document.getElementById('newPassword').value;
+
+        if (!username || !email || !password) {
+            alert('Please fill in all fields');
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/sub-user', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    username: username,
+                    email: email,
+                    password: password
+                })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                alert(data.message);
+                closeCreateUserModal();
+            } else {
+                alert('Error: ' + (data.detail || 'Failed to create user'));
+            }
+        } catch (error) {
+            alert('Network error: ' + error.message);
+        }
+    }
 </script>
 {% endblock %}
