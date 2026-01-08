@@ -1,0 +1,13 @@
+[
+  {
+    "method": "HTTPX",
+    "status": 403,
+    "server": "cloudflare",
+    "content_sample": "<!DOCTYPE html><html lang=\"en-US\"><head><title>Just a moment...</title><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\"><meta http-equiv=\"X-UA-Compatible\" content=\"IE=Edge\"><meta nam"
+  },
+  {
+    "method": "Playwright",
+    "status": 200,
+    "content_sample": "<!DOCTYPE html><html lang=\"en-US\" class=\"crjs\"><head>\n  <meta charset=\"UTF-8\">\n<script type=\"text/javascript\" async=\"\" src=\"https://www.googletagmanager.com/gtag/js?id=AW-16511114079&amp;cx=c&amp;gtm="
+  }
+]

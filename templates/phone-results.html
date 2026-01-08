@@ -60,7 +60,9 @@
                 </div>
                 <div>
                     <p class="text-gray-400">Created</p>
-                    <p class="text-lg">{{ session.created_at.strftime('%Y-%m-%d %H:%M') if session.created_at else 'N/A'
+                    <p class="text-lg local-time"
+                        data-timestamp="{{ session.created_at.isoformat() if session.created_at else '' }}">{{
+                        session.created_at.strftime('%Y-%m-%d %H:%M') if session.created_at else 'N/A'
                         }}</p>
                 </div>
                 <div class="md:col-span-3">
@@ -333,6 +335,22 @@
             document.cookie = "access_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
             window.location.href = "/login";
         }
+
+        // Local Time Fix
+        document.addEventListener('DOMContentLoaded', () => {
+            document.querySelectorAll('.local-time').forEach(el => {
+                const rawTs = el.getAttribute('data-timestamp');
+                if (!rawTs) return;
+                const date = new Date(rawTs.endsWith('Z') ? rawTs : rawTs + 'Z');
+                if (isNaN(date.getTime())) return;
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                const hours = String(date.getHours()).padStart(2, '0');
+                const minutes = String(date.getMinutes()).padStart(2, '0');
+                el.innerText = `${year}-${month}-${day} ${hours}:${minutes}`;
+            });
+        });
     </script>
 </body>
 

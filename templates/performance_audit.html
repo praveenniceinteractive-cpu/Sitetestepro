@@ -52,7 +52,10 @@
                             </td>
                             <td class="py-4">{{ result.ttfb }}ms</td>
                             <td class="py-4">{{ "%.2f"|format(result.page_load / 1000) }}s</td>
-                            <td class="py-4 text-gray-500 text-sm">Just now</td>
+                            <td class="py-4 text-gray-500 text-sm local-time"
+                                data-timestamp="{{ result.created_at.isoformat() }}">{{
+                                result.created_at.strftime('%Y-%m-%d %H:%M') }}
+                            </td>
                         </tr>
                         {% endfor %}
                         {% else %}
@@ -108,4 +111,5 @@
         return true;
     });
 </script>
+<script src="/static/performance-audit.js?v=2"></script>
 {% endblock %}

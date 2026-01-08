@@ -27,7 +27,21 @@
             https://example.com/contact
           </code>
         </div>
-        <input type="file" id="file-input" accept=".txt" class="hidden" required />
+        <input type="file" id="file-input" accept=".txt" class="hidden" />
+      </div>
+
+      <div class="flex items-center justify-center space-x-4">
+        <div class="h-px bg-gray-800 flex-1"></div>
+        <span class="text-gray-500 font-medium">OR</span>
+        <div class="h-px bg-gray-800 flex-1"></div>
+      </div>
+
+      <!-- Manual Entry -->
+      <div>
+        <label class="block text-sm font-medium text-gray-400 mb-2">Manually Enter URLs</label>
+        <textarea id="manual-urls" rows="5"
+          class="w-full bg-gray-900/50 border border-gray-700/50 rounded-xl p-4 text-gray-300 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-all font-mono text-sm"
+          placeholder="https://example.com&#10;https://example.com/about"></textarea>
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -162,5 +176,5 @@
   }
 </script>
 
-<script src="/static/static-script.js"></script>
+<script src="/static/static-script.js?v=2"></script>
 {% endblock %}

@@ -56,11 +56,18 @@ form.onsubmit = async (e) => {
     return;
   }
 
-  if (!fileInput.files[0]) {
+  const manualText = document.getElementById('manual-urls').value.trim();
+  let fileToUpload = fileInput.files[0];
+
+  if (!fileToUpload && manualText) {
+    fileToUpload = new File([manualText], "manual_urls.txt", { type: "text/plain" });
+  }
+
+  if (!fileToUpload) {
     Swal.fire({
       icon: 'info',
-      title: 'File Required',
-      text: 'Please select a urls.txt file to continue.',
+      title: 'URLs Required',
+      text: 'Please select a file OR enter URLs manually.',
       background: '#0f172a',
       color: '#f8fafc',
       confirmButtonColor: '#3b82f6'
@@ -115,7 +122,7 @@ form.onsubmit = async (e) => {
   stopButton.classList.remove('hidden');
 
   const formData = new FormData();
-  formData.append("file", fileInput.files[0]);
+  formData.append("file", fileToUpload);
   formData.append("browsers", JSON.stringify(selectedBrowsers));
   formData.append("resolutions", JSON.stringify(selectedResolutions));
   formData.append("session_name", sessionName);

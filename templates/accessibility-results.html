@@ -10,7 +10,9 @@
                     class="px-2.5 py-1 rounded-full text-xs font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center gap-1.5">
                     <i data-lucide="accessibility" class="w-3 h-3"></i> Accessibility Report
                 </span>
-                <span class="text-slate-500 text-sm">• {{ session.created_at.strftime('%Y-%m-%d') }}</span>
+                <span class="text-slate-500 text-sm">• <span class="local-time date-only"
+                        data-timestamp="{{ session.created_at.isoformat() }}">{{ session.created_at.strftime('%Y-%m-%d')
+                        }}</span></span>
             </div>
             <h1 class="text-3xl font-bold text-white tracking-tight">{{ session.name }}</h1>
         </div>

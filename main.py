@@ -39,10 +39,7 @@ import database
 import models
 import auth
 from config import settings
-from supabase import create_client, Client
 
-# Initialize Supabase Client
-supabase: Client = create_client(settings.supabase_url, settings.supabase_key)
 
 # Create necessary directories
 os.makedirs("screenshots", exist_ok=True)
@@ -384,33 +381,7 @@ async def record_videos_async(urls: List[str], selected_browsers: List[str],
                     # Video Path (Local)
                     video_url = f"/videos/{session_id}/{browser_name}/{os.path.basename(video_path_local)}"
                     
-                    # Try Upload to Supabase
-                    try:
-                        filename = os.path.basename(video_path_local)
-                        storage_path = f"{session_id}/{browser_name}/{filename}"
-                        
-                        # Define upload task
-                        def upload_to_supabase():
-                            with open(video_path_local, 'rb') as f:
-                                supabase.storage.from_("videos").upload(
-                                    storage_path,
-                                    f,
-                                    file_options={"content-type": "video/mp4", "upsert": "true"}
-                                )
-                            return supabase.storage.from_("videos").get_public_url(storage_path)
-
-                        # Run upload in thread pool
-                        loop = asyncio.get_running_loop()
-                        public_url = await loop.run_in_executor(executor, upload_to_supabase)
-                        
-                        if public_url:
-                            video_url = public_url
-                            print(f"[Supabase] Uploaded: {video_url}")
-                            # Optional: Remove local file after successful upload to save space
-                            # os.remove(video_path_local) 
-                    except Exception as upload_err:
-                        print(f"[Supabase] Upload Failed: {upload_err}")
-                        # Fallback to local path (video_url is already set)
+                    print(f"[DYNAMIC] Video Saved Locally: {video_url}")
 
                     print(f"[DYNAMIC] Final Video URL: {video_url}")
                     # Save result to DB
@@ -433,6 +404,12 @@ async def record_videos_async(urls: List[str], selected_browsers: List[str],
                             
                 except Exception as e:
                     print(f"[DYNAMIC][{browser_name}] ERROR: {url} @ {w}x{h} → {e}")
+                    # Still mark as completed so the frontend isn't stuck
+                    try:
+                        session.completed += 1
+                        db.commit()
+                    except:
+                        db.rollback()
 
             async def run_browser(browser_name: str):
                 os.makedirs(f"{session_folder}/{browser_name}", exist_ok=True)
@@ -554,7 +531,10 @@ async def record_fullpage_video(page, url: str, w: int, h: int, session_folder: 
         for i in range(frame_count):
             img_path = f"{frames_dir}/frame_{i:04d}.png"
             if os.path.exists(img_path):
-                images.append(imageio.imread(img_path))
+                # Ensure all images are RGB (3 channels) to prevent mixing with RGBA
+                with Image.open(img_path) as img:
+                    img = img.convert("RGB")
+                    images.append(np.array(img))
         
         if images:
             # Offload video generation to thread pool
@@ -680,26 +660,14 @@ async def audit_h1_tags(urls: List[str], session_id: str, user_id: int, db: Sess
 
 # ========== PHONE NUMBER AUDIT FUNCTIONS ==========
 
-async def audit_phone_numbers(urls: List[str], countries: List[str], options: List[str], 
+async def audit_phone_numbers(urls: List[str], target_number: str, options: List[str], 
                               session_id: str, user_id: int, db: Session):
-    """Audit phone numbers on multiple URLs"""
+    """Audit specific phone number on multiple URLs"""
     try:
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True)
             context = await browser.new_context()
             page = await context.new_page()
-            
-            # Define regex patterns for different countries
-            country_patterns = {
-                "US": [r'\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}', r'\d{3}[-.\s]?\d{3}[-.\s]?\d{4}'],
-                "UK": [r'\+44\s?\d{4}\s?\d{6}', r'0\d{4}\s?\d{6}', r'\(0\d{4}\)\s?\d{6}'],
-                "CA": [r'\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}'],
-                "AU": [r'\+61\s?\d\s?\d{4}\s?\d{4}', r'0\d\s?\d{4}\s?\d{4}'],
-                "DE": [r'\+49\s?\d{5,15}', r'0\d{5,15}'],
-                "FR": [r'\+33\s?\d{9}', r'0\d{9}'],
-                "JP": [r'\+81\s?\d{1,4}[-.\s]?\d{1,4}[-.\s]?\d{4}'],
-                "IN": [r'\+91\s?\d{5}\s?\d{5}', r'0\d{5}\s?\d{5}']
-            }
             
             for i, url in enumerate(urls):
                 try:
@@ -711,8 +679,8 @@ async def audit_phone_numbers(urls: List[str], countries: List[str], options: Li
                     await page.goto(url, wait_until="networkidle", timeout=90000)
                     await asyncio.sleep(2)  # Wait for page to load
                     
-                    # Extract phone numbers with location context
-                    found_numbers = await page.evaluate(r'''(patterns) => {
+                    # Search for specific number
+                    found_occurrences = await page.evaluate(r'''(target) => {
                         const results = [];
                         
                         function getTextNodes(node) {
@@ -756,244 +724,79 @@ async def audit_phone_numbers(urls: List[str], countries: List[str], options: Li
                         let node;
                         while (node = walker.nextNode()) {
                             const text = node.textContent;
-                            if (!text || text.trim().length < 5) continue;
+                            if (!text) continue;
                             
-                            // Check against all country patterns
-                            for (const [country, country_patterns] of Object.entries(patterns)) {
-                                for (const pattern of country_patterns) {
-                                    // Convert python regex slightly if needed or use simple regex
-                                    // For simplicity, we'll send regex strings that work in JS
-                                    try {
-                                        // Simple approximation for demo: finding numbers
-                                        // Real implementation would pass simpler regexes
-                                        const regex = new RegExp(pattern.replace(/\(\?<!\\d\)/g, '').replace(/\(?!\d\)/g, ''), 'g'); // Strip lookbehinds if any
-                                        
-                                        let match;
-                                        while ((match = regex.exec(text)) !== null) {
-                                            const number = match[0].trim();
-                                            const location = getLocation(node);
-                                            
-                                            // Avoid duplicates in results if possible
-                                            const exists = results.find(r => r.number === number);
-                                            if (!exists) {
-                                                results.push({ number, location, source: 'text' });
-                                            }
-                                        }
-                                    } catch (e) {
-                                        // Ignore regex errors
-                                    }
-                                }
+                            if (text.includes(target) || text.replace(/[^0-9]/g, '').includes(target.replace(/[^0-9]/g, ''))) {
+                                results.push({
+                                    number: target,
+                                    location: getLocation(node),
+                                    context: text.trim().substring(0, 50) + "..."
+                                });
                             }
                         }
                         
                         return results;
-                    }''', country_patterns)
+                    }''', target_number)
+
+                    # Deduplicate based on location
+                    unique_results = []
+                    seen = set()
+                    for item in found_occurrences:
+                        key = f"{item['number']}-{item['location']}"
+                        if key not in seen:
+                            unique_results.append(item)
+                            seen.add(key)
                     
-                    # Simplify: Playwright JS regex is limited compared to Python's.
-                    # APPROACH 2: Hybrid
-                    # 1. Get text content of specific regions
-                    regions_text = await page.evaluate('''() => {
-                        const getRegionText = (selector) => {
-                            const els = document.querySelectorAll(selector);
-                            let text = "";
-                            els.forEach(el => text += " " + el.innerText);
-                            return text;
-                        };
-                        
-                        return {
-                            header: getRegionText('header'),
-                            footer: getRegionText('footer'),
-                            body: document.body.innerText
-                        };
-                    }''')
-                    
-                    phone_numbers_data = [] # List of dicts: {number, location}
-                    seen_numbers = set()
                     issues = []
-                    formats_detected = set()
+                    if not unique_results:
+                        issues.append(f"Target number '{target_number}' not found on page.")
                     
-                    # Process regions
-                    for region_name, content in regions_text.items():
-                        location_label = region_name.capitalize()
-                        if not content: continue
-                        
-                        for country in countries:
-                            if country in country_patterns:
-                                for pattern in country_patterns[country]:
-                                    import re
-                                    matches = re.finditer(pattern, content)
-                                    for match in matches:
-                                        phone_number = match.group().strip()
-                                        
-                                        # Deduplicate globally? or per location? 
-                                        # Let's deduplicate globally but prefer Header/Footer location if found there
-                                        if phone_number not in seen_numbers:
-                                            seen_numbers.add(phone_number)
-                                            phone_numbers_data.append({
-                                                "number": phone_number,
-                                                "location": location_label if location_label in ["Header", "Footer"] else "Body"
-                                            })
-                                            formats_detected.add(country)
-                                        else:
-                                            # If already found in Body but now finding in Header/Footer, update it
-                                            if location_label in ["Header", "Footer"]:
-                                                for item in phone_numbers_data:
-                                                    if item["number"] == phone_number and item["location"] == "Body":
-                                                        item["location"] = location_label
-                                                        break
-                    
-                    # Check clickable links (separate check)
-                    if "clickable" in options:
-                        tel_links = await page.evaluate('''() => {
-                            const links = Array.from(document.querySelectorAll('a[href^="tel:"]'));
-                            return links.map(link => {
-                                // Determine origin
-                                let origin = 'Body';
-                                if (link.closest('header')) origin = 'Header';
-                                if (link.closest('footer')) origin = 'Footer';
-                                
-                                return {
-                                    number: link.href.replace('tel:', '').trim(),
-                                    location: origin
-                                };
-                            });
-                        }''')
-                        
-                        for link in tel_links:
-                            p_num = link["number"]
-                            p_loc = link["location"]
-                            
-                            if p_num and p_num not in seen_numbers:
-                                seen_numbers.add(p_num)
-                                phone_numbers_data.append({
-                                    "number": p_num,
-                                    "location": p_loc
-                                })
-                                issues.append("Click-to-call link found")
-                            elif p_num:
-                                 # Update location if better
-                                 if p_loc in ["Header", "Footer"]:
-                                     for item in phone_numbers_data:
-                                         if item["number"] == p_num and item["location"] == "Body":
-                                             item["location"] = p_loc
-                                             break
-
-                    # Check schema
-                    if "schema" in options:
-                         schema_phones = await page.evaluate('''() => {
-                            const schemas = Array.from(document.querySelectorAll('[itemtype*="Organization"], [itemtype*="LocalBusiness"]'));
-                            const phones = [];
-                            schemas.forEach(schema => {
-                                const phoneEl = schema.querySelector('[itemprop="telephone"]');
-                                if (phoneEl) {
-                                    phones.push(phoneEl.textContent.trim());
-                                }
-                            });
-                            return phones;
-                        }''')
-                         
-                         for schema_phone in schema_phones:
-                             if schema_phone and schema_phone not in seen_numbers:
-                                 seen_numbers.add(schema_phone)
-                                 phone_numbers_data.append({
-                                     "number": schema_phone,
-                                     "location": "Schema"
-                                 })
-                                 formats_detected.add("schema")
-
-                    # Validate (using stored numbers)
-                    if "validate" in options:
-                        for item in phone_numbers_data:
-                            phone = item["number"]
-                            try:
-                                parsed = phonenumbers.parse(phone, None)
-                                if not phonenumbers.is_valid_number(parsed):
-                                    issues.append(f"Invalid phone number format: {phone}")
-                            except:
-                                issues.append(f"Poorly formatted phone number: {phone}")
-
-                    # Consistency check
-                    if "consistency" in options and i > 0:
-                        prev_result = db.query(models.PhoneAuditResult).filter_by(
-                             session_id=session_id
-                        ).order_by(models.PhoneAuditResult.created_at.desc()).first()
-                        
-                        if prev_result:
-                            try:
-                                # Prev result might be old string list OR new dict list
-                                prev_data = json.loads(prev_result.phone_numbers)
-                                prev_numbers_set = set()
-                                if prev_data and isinstance(prev_data[0], dict):
-                                    prev_numbers_set = {p["number"] for p in prev_data}
-                                else:
-                                    prev_numbers_set = set(prev_data)
-                                    
-                                current_numbers_set = {p["number"] for p in phone_numbers_data}
-                                
-                                if prev_numbers_set != current_numbers_set:
-                                    issues.append("Phone numbers differ from other pages")
-                            except:
-                                pass
-
-                    # Save result
+                    # Store results
                     result = models.PhoneAuditResult(
                         session_id=session_id,
                         url=url,
-                        phone_numbers=json.dumps(phone_numbers_data), # Now storing dicts
-                        phone_count=len(phone_numbers_data),
-                        formats_detected=json.dumps(list(formats_detected)),
+                        phone_count=len(unique_results),
+                        phone_numbers=json.dumps(unique_results),
+                        formats_detected=json.dumps([]),
                         issues=json.dumps(issues)
                     )
                     db.add(result)
-                    
-                    # Update progress
-                    session = db.query(models.AuditSession).filter_by(session_id=session_id).first()
-                    if session:
-                        session.completed += 1
-                        db.commit()
-                    
-                    print(f"[PHONE AUDIT] {url} - {len(phone_numbers_data)} phone number(s) found")
-                    
+                    db.commit()
+
                 except Exception as e:
-                    print(f"[PHONE AUDIT] FAILED {url}: {e}")
-                    import traceback
-                    traceback.print_exc()
-                    
-                    # Save error result
+                    print(f"Error auditing {url}: {e}")
+                    # Log error result
                     result = models.PhoneAuditResult(
                         session_id=session_id,
                         url=url,
-                        phone_numbers=json.dumps([]),
                         phone_count=0,
+                        phone_numbers=json.dumps([]),
                         formats_detected=json.dumps([]),
-                        issues=json.dumps([f"Error: {str(e)[:100]}"])
+                        issues=json.dumps([f"Error: {str(e)}"])
                     )
                     db.add(result)
-                    
-                    # Update progress
-                    session = db.query(models.AuditSession).filter_by(session_id=session_id).first()
-                    if session:
-                        session.completed += 1
-                        db.commit()
-            
-            await context.close()
+                    db.commit()
+                
+                # Update progress
+                session = db.query(models.AuditSession).filter_by(session_id=session_id).first()
+                if session:
+                    session.completed = i + 1
+                    db.commit()
+
             await browser.close()
             
-        # Mark as completed
-        session = db.query(models.AuditSession).filter_by(session_id=session_id).first()
-        if session:
-            session.status = "completed"
-            session.completed_at = datetime.utcnow()
-            db.commit()
-            
+            # Mark session as completed
+            session = db.query(models.AuditSession).filter_by(session_id=session_id).first()
+            if session and session.status != "stopped":
+                session.status = "completed"
+                db.commit()
+
     except Exception as e:
-        print(f"Phone audit error: {e}")
+        print(f"Audit failed: {e}")
         session = db.query(models.AuditSession).filter_by(session_id=session_id).first()
         if session:
             session.status = "error"
             db.commit()
-    
-    print(f"PHONE AUDIT SESSION {session_id} COMPLETED")
 
 # ========== HELPER FUNCTIONS ==========
 def add_browser_frame(img_path: str, url: str):
@@ -1144,7 +947,7 @@ def h1_audit_task(urls: List[str], session_id: str, user_id: int, session_name: 
     finally:
         db.close()
 
-def phone_audit_task(urls: List[str], countries: List[str], options: List[str], 
+def phone_audit_task(urls: List[str], target_number: str, options: List[str], 
                      session_id: str, user_id: int, session_name: str):
     """Background task for phone audit"""
     db = database.SessionLocal()
@@ -1165,7 +968,7 @@ def phone_audit_task(urls: List[str], countries: List[str], options: List[str],
         db.commit()
         
         # Run the audit
-        asyncio.run(audit_phone_numbers(urls, countries, options, session_id, user_id, db))
+        asyncio.run(audit_phone_numbers(urls, target_number, options, session_id, user_id, db))
     finally:
         db.close()
 
@@ -1604,7 +1407,7 @@ def perform_session_cleanup(session_id: str, db: Session):
         # Manual Cascade Delete
         db.query(models.StaticAuditResult).filter_by(session_id=session_id).delete(synchronize_session=False)
         db.query(models.DynamicAuditResult).filter_by(session_id=session_id).delete(synchronize_session=False)
-        db.query(models.UnifiedAuditResult).filter_by(session_id=session_id).delete(synchronize_session=False)
+
         db.query(models.VisualAuditResult).filter_by(session_id=session_id).delete(synchronize_session=False)
         db.query(models.PerformanceAuditResult).filter_by(session_id=session_id).delete(synchronize_session=False)
         db.query(models.AccessibilityAuditResult).filter_by(session_id=session_id).delete(synchronize_session=False)
@@ -1698,7 +1501,12 @@ async def upload_static(
     
     content = await file.read()
     text_content = content.decode("utf-8", errors="ignore")
-    urls = [line.strip() for line in text_content.splitlines() if line.strip().startswith(("http://", "https://"))]
+    raw_urls = [line.strip() for line in text_content.splitlines() if line.strip()]
+    urls = []
+    for url in raw_urls:
+        if not url.startswith(("http://", "https://")):
+            url = "https://" + url
+        urls.append(url)
 
     if not urls:
         return JSONResponse({"error": "No valid URLs found"}, status_code=400)
@@ -1743,7 +1551,12 @@ async def upload_dynamic(
     
     content = await file.read()
     text_content = content.decode("utf-8", errors="ignore")
-    urls = [line.strip() for line in text_content.splitlines() if line.strip().startswith(("http://", "https://"))]
+    raw_urls = [line.strip() for line in text_content.splitlines() if line.strip()]
+    urls = []
+    for url in raw_urls:
+        if not url.startswith(("http://", "https://")):
+            url = "https://" + url
+        urls.append(url)
 
     if not urls:
         return JSONResponse({"error": "No valid URLs found"}, status_code=400)
@@ -1813,7 +1626,7 @@ async def upload_h1(
 async def upload_phone(
     request: Request,
     file: UploadFile = File(...),
-    countries: str = Form("[]"),
+    target_number: str = Form(...),
     options: str = Form("[]"),
     session_name: str = Form("My Phone Audit"),
     background_tasks: BackgroundTasks = None,
@@ -1826,21 +1639,26 @@ async def upload_phone(
     
     content = await file.read()
     text_content = content.decode("utf-8", errors="ignore")
-    urls = [line.strip() for line in text_content.splitlines() if line.strip().startswith(("http://", "https://"))]
+    raw_urls = [line.strip() for line in text_content.splitlines() if line.strip()]
+    urls = []
+    for url in raw_urls:
+        if not url.startswith(("http://", "https://")):
+            url = "https://" + url
+        urls.append(url)
 
     if not urls:
         return JSONResponse({"error": "No valid URLs found"}, status_code=400)
 
-    selected_countries = json.loads(countries)
-    selected_options = json.loads(options)
+    # Validate target number is not empty
+    if not target_number.strip():
+        return JSONResponse({"error": "Target phone number is required"}, status_code=400)
 
-    if not selected_countries:
-        return JSONResponse({"error": "Select at least one country code"}, status_code=400)
+    selected_options = json.loads(options)
 
     session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
     
     # Start background task
-    background_tasks.add_task(phone_audit_task, urls, selected_countries, selected_options, session_id, user.id, session_name)
+    background_tasks.add_task(phone_audit_task, urls, target_number, selected_options, session_id, user.id, session_name)
     
     # Store task reference
     running_tasks[session_id] = "phone"
@@ -1957,10 +1775,7 @@ async def delete_all_sessions(
              try:
                 db.query(models.PhoneAuditResult).filter_by(session_id=session.session_id).delete()
              except: pass
-        elif session.session_type == "unified":
-             try:
-                db.query(models.UnifiedAuditResult).filter_by(session_id=session.session_id).delete()
-             except: pass
+
         elif session.session_type == "accessibility":
              try:
                 db.query(models.AccessibilityAuditResult).filter_by(session_id=session.session_id).delete()
@@ -2696,7 +2511,11 @@ async def trigger_performance_test(
     
     background_tasks.add_task(audit_performance_logic, url_list, session_id)
     
-    return RedirectResponse(url="/platform/performance?status=started", status_code=303)
+    return JSONResponse({
+        "status": "started", 
+        "session_id": session_id,
+        "message": "Performance audit started"
+    })
 
 @app.get("/api/results/{session_id}")
 async def get_any_results(session_id: str, request: Request, db: Session = Depends(auth.get_db)):
@@ -2709,18 +2528,25 @@ async def get_any_results(session_id: str, request: Request, db: Session = Depen
     if not session:
         raise HTTPException(status_code=404)
         
+    response_data = {
+        "status": session.status,
+        "results": []
+    }
+
     if session.session_type == "visual":
          results = db.query(models.VisualAuditResult).filter_by(session_id=session_id).all()
-         return [{"score": r.diff_score, "diff_img": r.diff_image_path} for r in results]
+         response_data["results"] = [{"score": r.diff_score, "diff_img": r.diff_image_path} for r in results]
     elif session.session_type == "performance":
          results = db.query(models.PerformanceAuditResult).filter_by(session_id=session_id).all()
-         return [{
+         response_data["results"] = [{
              "url": r.url,
              "ttfb": r.ttfb,
              "fcp": r.fcp,
-             "score": r.score
+             "score": r.score,
+             "page_load": r.page_load if hasattr(r, 'page_load') else 0
          } for r in results]
-    return []
+         
+    return response_data
 
 @app.get("/session-config/static/{session_id}")
 async def get_static_session_config(session_id: str, request: Request, db: Session = Depends(auth.get_db)):
@@ -2908,177 +2734,146 @@ async def get_accessibility_results(session_id: str, request: Request, db: Sessi
 
 @app.get("/api/proxy")
 async def proxy_url(url: str):
-    """Proxy endpoint to bypass X-Frame-Options"""
+    """Proxy endpoint to bypass X-Frame-Options with enhanced compatibility and Playwright fallback"""
     if not url.startswith("http"):
         url = "https://" + url
         
+    async def process_content(content_bytes, final_url, headers):
+        """Helper to inject base tag and process headers"""
+        # Inject <base> tag for relative links if HTML
+        content_type = headers.get("content-type", "").lower()
+        if "text/html" in content_type:
+            try:
+                # Use the final URL after redirects for the base tag
+                html = content_bytes.decode("utf-8", errors="replace")
+                
+                # Inject base tag
+                base_tag = f'<base href="{final_url}">'
+                
+                if "<head>" in html:
+                    html = html.replace("<head>", f"<head>{base_tag}", 1)
+                elif "<HEAD>" in html:
+                    html = html.replace("<HEAD>", f"<HEAD>{base_tag}", 1)
+                else:
+                    # If no head, prepend to body or html
+                     html = base_tag + html
+                    
+                content_bytes = html.encode("utf-8")
+                # Update content-type to ensure utf-8
+                headers["content-type"] = "text/html; charset=utf-8"
+            except Exception as e:
+                print(f"Proxy rewrite error: {e}")
+                pass
+        return content_bytes, headers
+
+    # Mimic a real browser to avoid 403 blocks with httpx
+    req_headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Upgrade-Insecure-Requests": "1",
+        "Sec-Ch-Ua": '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+        "Sec-Ch-Ua-Mobile": "?0",
+        "Sec-Ch-Ua-Platform": '"Windows"',
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Site": "cross-site",
+        "Sec-Fetch-User": "?1",
+        "Referer": "https://www.google.com/"
+    }
+
     try:
-        async with httpx.AsyncClient(follow_redirects=True) as client:
-            resp = await client.get(url, timeout=10.0)
+        # ATTEMPT 1: Fast HTTPX Proxy
+        async with httpx.AsyncClient(follow_redirects=True, verify=False) as client:
+            resp = await client.get(url, headers=req_headers, timeout=15.0)
             
-            # Filter headers that block iframes or cause encoding issues
+            # If 403/429/503/202, we assume bot protection or blocking and try Playwright
+            # 202 is often used by Amazon WAF as "Accepted" but empty challenge page
+            if resp.status_code in [403, 429, 503, 202]:
+                print(f"HTTPX got {resp.status_code} for {url}. Switching to Playwright fallback...")
+                raise Exception("Trigger Playwright Fallback")
+
+            # Filter headers
             excluded_headers = [
-                'x-frame-options', 
-                'content-security-policy', 
-                'frame-options',
-                'content-encoding',
-                'transfer-encoding',
-                'content-length' 
+                'x-frame-options', 'content-security-policy', 'frame-options',
+                'content-encoding', 'transfer-encoding', 'content-length',
+                'connection', 'keep-alive', 'set-cookie'
             ]
-            headers = {
-                k: v for k, v in resp.headers.items() 
-                if k.lower() not in excluded_headers
-            }
+            headers = {k: v for k, v in resp.headers.items() if k.lower() not in excluded_headers}
             
-            # Rewrite relative links (simple attempt) - robust rewriting is complex, 
-            # this is a basic "Device Lab" simulation proxy.
-            content = resp.content
-            
+            content, headers = await process_content(resp.content, str(resp.url), headers)
             return Response(content=content, status_code=resp.status_code, headers=headers)
+
     except Exception as e:
-        return Response(content=f"Proxy Error: {str(e)}", status_code=502)
+        # ATTEMPT 2: Playwright Fallback
+        if "Trigger Playwright Fallback" not in str(e) and str(resp.status_code) not in str(e):
+             print(f"Proxy HTTPX Error: {e}, failing over to Playwright explicitly just in case.")
+        
+        try:
+            print(f"Attempting Playwright fetch for {url}")
+            async with async_playwright() as p:
+                # Add stealth args to avoid detection
+                browser = await p.chromium.launch(
+                    headless=True,
+                    args=["--disable-blink-features=AutomationControlled"],
+                    ignore_default_args=["--enable-automation"]
+                )
+                
+                # Context with stealth headers and viewport
+                context = await browser.new_context(
+                    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                    viewport={"width": 1920, "height": 1080},
+                    locale="en-US",
+                    timezone_id="America/New_York",
+                    permissions=["geolocation"]
+                )
+                
+                page = await context.new_page()
+                
+                # Add extra init script to hide webdriver
+                await page.add_init_script("""
+                    Object.defineProperty(navigator, 'webdriver', {
+                        get: () => undefined
+                    });
+                """)
+                
+                try:
+                    response = await page.goto(url, timeout=30000, wait_until="domcontentloaded")
+                    
+                    # Wait a bit if we hit a challenge (simple heuristic)
+                    if response and response.status in [403, 202, 503]:
+                        print("Waiting for potential challenge resolution...")
+                        await page.wait_for_timeout(5000)
+                    
+                    final_url = page.url
+                    content_str = await page.content()
+                    status_code = response.status if response else 200
+                    
+                    # Convert to bytes
+                    content_bytes = content_str.encode("utf-8")
+                    
+                    # Basic headers
+                    headers = {
+                        "Content-Type": "text/html; charset=utf-8",
+                        "Cache-Control": "no-cache"
+                    }
+                    
+                    content, headers = await process_content(content_bytes, final_url, headers)
+                    
+                    return Response(content=content, status_code=status_code, headers=headers)
+                    
+                finally:
+                    await browser.close()
+        except Exception as pw_error:
+            print(f"Playwright Proxy Error: {pw_error}")
+            return Response(content=f"Proxy Error: {str(e)} | Fallback Error: {str(pw_error)}", status_code=502)
 
 
 # ========== UNIFIED AUDIT FUNCTIONS ==========
 
-async def audit_unified_logic(urls: List[str], session_id: str, user_id: int):
-    # Create new session for background task
-    db = database.SessionLocal()
-    try:
-        # Launch concurrently
-        tasks = []
-        
-        # 1. Performance (Manages its own session, no DB arg needed)
-        tasks.append(audit_performance_logic(urls, session_id))
-        
-        # 2. Accessibility (Needs DB)
-        tasks.append(audit_accessibility_logic(urls, session_id, db))
-        
-        # 3. H1 / SEO (Needs DB)
-        tasks.append(audit_h1_tags(urls, session_id, user_id, db))
-        
-        # 4. Phone / Content (Needs DB)
-        tasks.append(audit_phone_numbers(urls, ["US", "UK", "IN"], ["validate"], session_id, user_id, db))
-        
-        await asyncio.gather(*tasks)
-        
-        # Aggregate Results
-        for url in urls:
-            try:
-                # Default Scores
-                perf_score = 0
-                a11y_score = 0
-                seo_score = 0
-                content_score = 0
-                
-                # Fetch sub-results
-                perf_res = db.query(models.PerformanceAuditResult).filter_by(session_id=session_id, url=url).first()
-                if perf_res: perf_score = perf_res.score
-                
-                a11y_res = db.query(models.AccessibilityAuditResult).filter_by(session_id=session_id, url=url).first()
-                if a11y_res: a11y_score = a11y_res.score
-                
-                # Calculate basic SEO score from H1
-                h1_res = db.query(models.H1AuditResult).filter_by(session_id=session_id, url=url).first()
-                if h1_res:
-                     issues = json.loads(h1_res.issues)
-                     seo_score = 100 - (len(issues) * 10)
-                     if seo_score < 0: seo_score = 0
-                
-                # Calculate basic Content score from Phone
-                phone_res = db.query(models.PhoneAuditResult).filter_by(session_id=session_id, url=url).first()
-                if phone_res:
-                     content_score = 100 # Optimistic default if found
-                     if phone_res.phone_count == 0: content_score = 50 # Maybe okay, but low
-                
-                # Overall
-                overall = int((perf_score + a11y_score + seo_score + content_score) / 4)
-                
-                unified_res = models.UnifiedAuditResult(
-                    session_id=session_id,
-                    url=url,
-                    performance_score=perf_score,
-                    accessibility_score=a11y_score,
-                    seo_score=seo_score,
-                    content_score=content_score,
-                    overall_score=overall
-                )
-                db.add(unified_res)
-                
-            except Exception as e:
-                print(f"Aggregation Error {url}: {e}")
-        
-        db.commit()
-        
-        # Mark Session Complete
-        session = db.query(models.AuditSession).filter_by(session_id=session_id).first()
-        if session:
-            session.status = "completed"
-            session.completed = 100
-            session.completed_at = datetime.utcnow()
-            db.commit()
-            
-    except Exception as e:
-        print(f"Unified Audit Error: {e}")
-        session = db.query(models.AuditSession).filter_by(session_id=session_id).first()
-        if session:
-            session.status = "error"
-            db.commit()
-    finally:
-        db.close()
 
-@app.get("/platform/unified", response_class=HTMLResponse)
-async def unified_audit_view(request: Request, user: models.User = Depends(require_auth)):
-    return templates.TemplateResponse("unified-audit.html", {"request": request, "user": user})
 
-@app.post("/api/unified-test")
-async def trigger_unified_test(
-    background_tasks: BackgroundTasks,
-    urls: str = Form(...),
-    user: models.User = Depends(require_auth),
-    db: Session = Depends(auth.get_db)
-):
-    url_list = [u.strip() for u in urls.splitlines() if u.strip()]
-    if not url_list:
-        raise HTTPException(status_code=400, detail="No URLs provided")
-        
-    session_id = f"uni_{uuid.uuid4().hex[:8]}"
-    
-    new_session = models.AuditSession(
-        session_id=session_id,
-        user_id=user.id,
-        session_type="unified",
-        name=f"Unified: {len(url_list)} URLs",
-        urls=json.dumps(url_list),
-        browsers=json.dumps(["Chrome"]),
-        resolutions=json.dumps(["Default"]),
-        total_expected=len(url_list) * 4 
-    )
-    db.add(new_session)
-    db.commit()
-    
-    background_tasks.add_task(audit_unified_logic, url_list, session_id, user.id)
-    
-    return RedirectResponse(url="/platform/unified?status=started", status_code=303)
 
-@app.get("/unified-results/{session_id}")
-async def get_unified_results(session_id: str, request: Request, db: Session = Depends(auth.get_db)):
-    user = await get_current_user_from_cookie(request, db)
-    if not user:
-        return RedirectResponse("/login")
-        
-    session = db.query(models.AuditSession).filter_by(session_id=session_id, user_id=user.id).first()
-    if not session:
-        raise HTTPException(status_code=404)
-        
-    results = db.query(models.UnifiedAuditResult).filter_by(session_id=session_id).all()
-    
-    return templates.TemplateResponse("unified-results.html", {
-        "request": request, 
-        "user": user,
-        "session": session,
-        "results": results
-    })
 
 if __name__ == "__main__":
     import uvicorn

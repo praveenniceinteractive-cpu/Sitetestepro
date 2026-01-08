@@ -18,13 +18,7 @@
             Quick Actions
         </h3>
         <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            <a href="/platform/unified"
-                class="p-4 bg-slate-800/50 hover:bg-slate-800 border border-white/5 hover:border-blue-500/50 rounded-xl transition group text-center flex flex-col items-center gap-2">
-                <div class="p-2 bg-cyan-500/10 text-cyan-400 rounded-lg group-hover:scale-110 transition">
-                    <i data-lucide="layers" class="w-5 h-5"></i>
-                </div>
-                <span class="text-sm font-medium text-slate-300 group-hover:text-white">Unified Audit</span>
-            </a>
+
 
             <a href="/responsive"
                 class="p-4 bg-slate-800/50 hover:bg-slate-800 border border-white/5 hover:border-blue-500/50 rounded-xl transition group text-center flex flex-col items-center gap-2">
@@ -114,16 +108,13 @@
                         </td>
                         <td class="px-6 py-4">
                             <span class="inline-flex items-center justify-center gap-2 w-32 py-1.5 rounded-full text-xs font-medium border shadow-sm
-                                {% if session.session_type == 'unified' %}bg-cyan-500/10 text-cyan-400 border-cyan-500/20
-                                {% elif session.session_type == 'accessibility' %}bg-amber-500/10 text-amber-400 border-amber-500/20
+                                {% if session.session_type == 'accessibility' %}bg-amber-500/10 text-amber-400 border-amber-500/20
                                 {% elif session.session_type == 'performance' %}bg-blue-500/10 text-blue-400 border-blue-500/20
                                 {% elif session.session_type == 'phone' %}bg-emerald-500/10 text-emerald-400 border-emerald-500/20
                                 {% elif session.session_type == 'h1' %}bg-purple-500/10 text-purple-400 border-purple-500/20
                                 {% else %}bg-slate-700/50 text-slate-400 border-white/10{% endif %}">
 
-                                {% if session.session_type == 'unified' %}<i data-lucide="layers"
-                                    class="w-3.5 h-3.5"></i>
-                                {% elif session.session_type == 'accessibility' %}<i data-lucide="accessibility"
+                                {% if session.session_type == 'accessibility' %}<i data-lucide="accessibility"
                                     class="w-3.5 h-3.5"></i>
                                 {% elif session.session_type == 'performance' %}<i data-lucide="zap"
                                     class="w-3.5 h-3.5"></i>
@@ -148,7 +139,8 @@
                                 {{ session.status|title }}
                             </span>
                         </td>
-                        <td class="px-6 py-4 text-slate-400">
+                        <td class="px-6 py-4 text-slate-400 session-date-cell"
+                            data-timestamp="{{ session.created_at.isoformat() if session.created_at else '' }}">
                             {{ session.created_at.strftime('%Y-%m-%d') if session.created_at else 'N/A' }}
                             <div class="text-xs text-slate-600">{{ session.created_at.strftime('%H:%M') if
                                 session.created_at else '' }}</div>
@@ -164,8 +156,7 @@
                                 {% endif %}
 
                                 {% if session.status == 'completed' %}
-                                <a href="{% if session.session_type == 'unified' %}/unified-results/{{session.session_id}}
-                                         {% elif session.session_type == 'accessibility' %}/accessibility-results/{{session.session_id}}
+                                <a href="{% if session.session_type == 'accessibility' %}/accessibility-results/{{session.session_id}}
                                          {% elif session.session_type == 'visual' %}/platform/visual?status=completed&session={{session.session_id}}
                                          {% elif session.session_type == 'performance' %}/platform/performance?status=completed&session={{session.session_id}}
                                          {% elif session.session_type == 'static' %}/static-results/{{session.session_id}}
@@ -365,5 +356,33 @@
             row.style.display = name.includes(term) ? '' : 'none';
         });
     });
+
+    // Format Dates to Local Timezone
+    function formatDates() {
+        document.querySelectorAll('.session-date-cell').forEach(cell => {
+            const rawTs = cell.getAttribute('data-timestamp');
+            if (!rawTs) return;
+
+            // Assume UTC as per models.py (datetime.utcnow)
+            // Append Z to ensure it is treated as UTC
+            const ts = rawTs.endsWith('Z') ? rawTs : rawTs + 'Z';
+            const date = new Date(ts);
+
+            // Format Date: YYYY-MM-DD
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const formattedDate = `${year}-${month}-${day}`;
+
+            // Format Time: HH:MM (24-hour)
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            const formattedTime = `${hours}:${minutes}`;
+
+            cell.innerHTML = `${formattedDate} <div class="text-xs text-slate-600">${formattedTime}</div>`;
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', formatDates);
 </script>
 {% endblock %}

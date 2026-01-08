@@ -56,29 +56,37 @@ form.onsubmit = async (e) => {
         return;
     }
 
-    if (!fileInput.files[0]) {
-        Swal.fire({
-            icon: 'info',
-            title: 'File Required',
-            text: 'Please select a urls.txt file to continue.',
-            background: '#0f172a',
-            color: '#f8fafc',
-            confirmButtonColor: '#3b82f6'
-        });
-        return;
+    let fileToUpload = fileInput.files[0];
+    const manualText = document.getElementById('manual-urls').value.trim();
+
+    if (!fileToUpload) {
+        if (manualText) {
+            // Create file from manual text
+            const blob = new Blob([manualText], { type: 'text/plain' });
+            fileToUpload = new File([blob], "manual_urls.txt", { type: "text/plain" });
+        } else {
+            Swal.fire({
+                icon: 'info',
+                title: 'Input Required',
+                text: 'Please select a urls.txt file or enter URLs manually.',
+                background: '#0f172a',
+                color: '#f8fafc',
+                confirmButtonColor: '#3b82f6'
+            });
+            return;
+        }
     }
 
     const sessionName = document.querySelector('input[name="session_name"]').value;
-    const selectedCountries = Array.from(document.querySelectorAll('input[name="country"]:checked'))
-        .map(cb => cb.value);
+    const targetNumber = document.querySelector('input[name="target_number"]').value.trim();
     const selectedOptions = Array.from(document.querySelectorAll('input[name="option"]:checked'))
         .map(cb => cb.value);
 
-    if (selectedCountries.length === 0) {
+    if (!targetNumber) {
         Swal.fire({
             icon: 'info',
-            title: 'Country Selection Required',
-            text: 'Please select at least one country code to continue.',
+            title: 'Target Number Required',
+            text: 'Please enter a target phone number to search for.',
             background: '#0f172a',
             color: '#f8fafc',
             confirmButtonColor: '#3b82f6'
@@ -105,9 +113,9 @@ form.onsubmit = async (e) => {
     stopButton.classList.remove('hidden');
 
     const formData = new FormData();
-    formData.append("file", fileInput.files[0]);
+    formData.append("file", fileToUpload);
     formData.append("session_name", sessionName);
-    formData.append("countries", JSON.stringify(selectedCountries));
+    formData.append("target_number", targetNumber);
     formData.append("options", JSON.stringify(selectedOptions));
 
     try {
@@ -323,7 +331,7 @@ function displayResults(results) {
                                         </span>
                                     </td>
                                     <td class="py-4 px-4">
-                                        <span class="px-3 py-1 rounded-full text-sm ${statusClass}">
+                                        <span class="px-3 py-1 rounded-full text-sm whitespace-nowrap ${statusClass}">
                                             ${statusText}
                                         </span>
                                         ${formats.length > 0 ? `<div class="text-xs text-gray-400 mt-1">${formats.join(', ')}</div>` : ''}

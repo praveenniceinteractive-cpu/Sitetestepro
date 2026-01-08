@@ -14,10 +14,7 @@ class Settings(BaseSettings):
     # Database Configuration
     database_url: str
     
-    # Supabase Configuration
-    supabase_url: str
-    supabase_key: str
-    
+
     # Security Settings
     secret_key: str
     algorithm: str = "HS256"
@@ -47,6 +44,7 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = False
+        extra = "ignore"
 
 
 @lru_cache()

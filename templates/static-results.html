@@ -83,7 +83,8 @@
                 </div>
                 <div>
                     <p class="text-gray-400">Created</p>
-                    <p class="text-lg">{{ session.created_at.strftime('%Y-%m-%d %H:%M') }}</p>
+                    <p class="text-lg local-time" data-timestamp="{{ session.created_at.isoformat() }}">{{
+                        session.created_at.strftime('%Y-%m-%d %H:%M') }}</p>
                 </div>
                 <div class="md:col-span-3">
                     <p class="text-gray-400">URLs</p>
@@ -112,6 +113,22 @@
     </div>
 
     <script>
+        // Local Time Fix
+        document.addEventListener('DOMContentLoaded', () => {
+            document.querySelectorAll('.local-time').forEach(el => {
+                const rawTs = el.getAttribute('data-timestamp');
+                if (!rawTs) return;
+                const date = new Date(rawTs.endsWith('Z') ? rawTs : rawTs + 'Z');
+                if (isNaN(date.getTime())) return;
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                const hours = String(date.getHours()).padStart(2, '0');
+                const minutes = String(date.getMinutes()).padStart(2, '0');
+                el.innerText = `${year}-${month}-${day} ${hours}:${minutes}`;
+            });
+        });
+
         // Template version check - if you see an old timestamp, hard refresh!
         const TEMPLATE_VERSION = "{{ cache_buster }}";
         console.log("=".repeat(60));

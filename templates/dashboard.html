@@ -97,8 +97,7 @@
 
             <div class="flex-1 overflow-y-auto max-h-[400px]">
                 {% for session in recent_sessions %}
-                <a href="{% if session.session_type == 'unified' %}/unified-results/{{session.session_id}}
-                         {% elif session.session_type == 'accessibility' %}/accessibility-results/{{session.session_id}}
+                <a href="{% if session.session_type == 'accessibility' %}/accessibility-results/{{session.session_id}}
                          {% elif session.session_type == 'visual' %}/platform/visual?status=completed&session={{session.session_id}}
                          {% elif session.session_type == 'performance' %}/platform/performance?status=completed&session={{session.session_id}}
                          {% elif session.session_type == 'static' %}/static-results/{{session.session_id}}
@@ -110,13 +109,11 @@
                     <div class="flex items-center gap-4">
                         <!-- Icon Badge -->
                         <div class="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0
-                            {% if session.session_type == 'unified' %}bg-cyan-500/10 text-cyan-400
-                            {% elif session.session_type == 'accessibility' %}bg-amber-500/10 text-amber-400
+                            {% if session.session_type == 'accessibility' %}bg-amber-500/10 text-amber-400
                             {% elif session.session_type == 'performance' %}bg-blue-500/10 text-blue-400
                             {% else %}bg-slate-700/50 text-slate-400{% endif %}">
 
-                            {% if session.session_type == 'unified' %}<i data-lucide="layers" class="w-5 h-5"></i>
-                            {% elif session.session_type == 'accessibility' %}<i data-lucide="accessibility"
+                            {% if session.session_type == 'accessibility' %}<i data-lucide="accessibility"
                                 class="w-5 h-5"></i>
                             {% elif session.session_type == 'performance' %}<i data-lucide="zap" class="w-5 h-5"></i>
                             {% elif session.session_type == 'phone' %}<i data-lucide="phone" class="w-5 h-5"></i>
@@ -128,7 +125,8 @@
                             <div class="flex justify-between items-start">
                                 <p class="text-sm font-medium text-white group-hover:text-blue-400 transition truncate">
                                     {{ session.name }}</p>
-                                <span class="text-xs text-slate-500 whitespace-nowrap ml-2">
+                                <span class="text-xs text-slate-500 whitespace-nowrap ml-2 local-time time-only"
+                                    data-timestamp="{{ session.created_at.isoformat() if session.created_at else '' }}">
                                     {{ session.created_at.strftime('%H:%M') if session.created_at else '' }}
                                 </span>
                             </div>

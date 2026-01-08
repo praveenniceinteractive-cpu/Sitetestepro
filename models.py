@@ -125,22 +125,7 @@ class AccessibilityAuditResult(Base):
     report_json = Column(Text, nullable=False) # Full JSON report from Axe
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
-class UnifiedAuditResult(Base):
-    __tablename__ = "unified_audit_results"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    session_id = Column(String, ForeignKey("audit_sessions.session_id"), nullable=False)
-    url = Column(String, nullable=False)
-    
-    # Scores (0-100)
-    performance_score = Column(Integer, default=0)
-    accessibility_score = Column(Integer, default=0)
-    seo_score = Column(Integer, default=0) # Based on H1/Meta
-    content_score = Column(Integer, default=0) # Based on Phone/Links
-    
-    # Meta
-    overall_score = Column(Integer, default=0)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
 
 class StaticAuditResult(Base):
     __tablename__ = "static_audit_results"
